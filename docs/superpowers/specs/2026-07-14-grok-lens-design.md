@@ -207,11 +207,12 @@ Path, description, aggregates, model mix, table of primary sessions (expandable 
 
 ## Stack
 
-- Ruby 3+ / 4.x (workspace has 4.0.x)
+- **Ruby 4.x required** (workspace baseline: 4.0.x; do not target Ruby 3)
 - Sinatra, Puma, Rack
 - ERB views, `public/styles.css`
 - Optional: `sqlite3` gem for search index enrich; degrade if missing
 - No Node/npm build step
+- `Gemfile` / README: document `ruby ">= 4.0"` and fail fast on older interpreters
 
 ### Layout
 
