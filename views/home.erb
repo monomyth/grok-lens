@@ -1,0 +1,106 @@
+<% @title = "Grok Lens" %>
+
+<% if @snap.missing_home %>
+  <section class="empty">
+    <h1>No Grok home found</h1>
+    <p>Looked for <code><%= h(@snap.grok_home) %></code>. Set <code>GROK_HOME</code> if your data lives elsewhere.</p>
+  </section>
+<% else %>
+
+<section class="stats-strip">
+  <div class="stat">
+    <div class="label">Active</div>
+    <div class="value num"><%= @snap.active_sessions.count { |s| s.active? } %></div>
+    <div class="sub"><%= @snap.active_sessions.count(&:stale?) %> stale</div>
+  </div>
+  <div class="stat">
+    <div class="label">Est. tokens</div>
+    <div class="value num"><%= est(@snap.total_est_tokens) %></div>
+    <div class="sub">all sessions · est.</div>
+  </div>
+  <div class="stat">
+    <div class="label">Primary sessions</div>
+    <div class="value num"><%= @snap.primary_sessions.size %></div>
+    <div class="sub"><%= @snap.sessions_by_id.size %> incl. nested</div>
+  </div>
+  <div class="stat">
+    <div class="label">Models</div>
+    <div class="model-list"><%= model_bars(@snap.models_hist) %></div>
+  </div>
+</section>
+
+<% if @snap.active_sessions.any? %>
+<section class="block">
+  <h2 class="section-title">Active now</h2>
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Project</th>
+        <th>Title</th>
+        <th>Model</th>
+        <th class="r">Turns</th>
+        <th class="r">Est. tok</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @snap.active_sessions.each do |s| %>
+        <tr>
+          <td><span class="dot <%= s.status %>"></span><%= status_label(s.status) %><% if s.pid %> <span class="muted">pid <%= s.pid %></span><% end %></td>
+          <td class="mono"><%= h(File.basename(s.cwd.to_s)) %></td>
+          <td><a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
+            <% if s.children.any? %><span class="badge">+<%= s.children.size %> sub</span><% end %>
+          </td>
+          <td><%= h(s.current_model_id || s.models.first) %></td>
+          <td class="r num"><%= s.num_turns %></td>
+          <td class="r num"><%= est(s.est_tokens) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+<% end %>
+
+<section class="dual">
+  <div class="col">
+    <h2 class="section-title">Projects</h2>
+    <% if @snap.projects.empty? %>
+      <p class="muted">No projects found.</p>
+    <% end %>
+    <% @snap.projects.each do |p| %>
+      <article class="project-card">
+        <div class="row">
+          <h3><a href="/projects/<%= h(p.id) %>"><%= h(p.name) %></a></h3>
+          <span class="muted num"><%= p.session_count %> sess · <%= est(p.est_tokens) %></span>
+        </div>
+        <div class="mono path"><%= h(short_path(p.path)) %></div>
+        <p class="desc"><%= h(p.description) %></p>
+        <div class="model-list compact"><%= model_bars(p.models_hist) %></div>
+      </article>
+    <% end %>
+  </div>
+
+  <div class="col">
+    <div class="row between">
+      <h2 class="section-title">Recent sessions</h2>
+      <input type="search" id="filter" class="filter" placeholder="Filter…" aria-label="Filter sessions">
+    </div>
+    <table class="ledger" id="recent-sessions">
+      <tbody>
+        <% @snap.primary_sessions.first(40).each do |s| %>
+          <tr data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id}") %>">
+            <td class="age muted num"><%= relative_time(s.last_active_at) %></td>
+            <td>
+              <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
+              <% if s.children.any? %><span class="badge">+<%= s.children.size %> sub</span><% end %>
+              <div class="subline muted"><%= h(File.basename(s.cwd.to_s)) %> · <%= h(s.current_model_id) %> · <%= s.num_turns %> turns · <%= s.num_messages %> msgs</div>
+            </td>
+            <td class="r num"><%= est(s.est_tokens) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<% end %>

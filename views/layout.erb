@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= @title || "Grok Lens" %></title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div class="brand">
+        <a href="/" class="logo">Grok Lens</a>
+        <% if @snap %>
+          <span class="meta">snapshot · <%= @snap.scanned_at.utc.strftime("%Y-%m-%d %H:%M UTC") %></span>
+        <% end %>
+      </div>
+      <div class="header-stats">
+        <% if @snap && !@snap.missing_home %>
+          <span class="num"><%= @snap.primary_sessions.size %></span> sessions
+          <span class="sep">·</span>
+          <span class="num"><%= @snap.projects.size %></span> projects
+          <span class="sep">·</span>
+          <span class="num"><%= est(@snap.total_est_tokens) %></span> est. tokens
+        <% end %>
+        <form class="inline" action="/refresh" method="post">
+          <button type="submit" class="btn">Refresh</button>
+        </form>
+      </div>
+    </header>
+
+    <main>
+      <%= yield %>
+    </main>
+
+    <footer class="site-footer">
+      <span>v<%= GrokLens::VERSION %> · Ruby <%= RUBY_VERSION %> · read-only <%= h(@snap&.grok_home || ENV.fetch("GROK_HOME", "~/.grok")) %></span>
+      <% if @snap && @snap.warnings.any? %>
+        <span class="warn"><%= @snap.warnings.size %> warning<%= @snap.warnings.size == 1 ? "" : "s" %></span>
+      <% end %>
+      <span class="muted">Token figures are estimates (not API usage). Live polling: TODO.</span>
+    </footer>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+if RUBY_VERSION.split(".").first.to_i < 4
+  warn "Grok Lens requires Ruby 4.0+ (running #{RUBY_VERSION})"
+  exit 1
+end
+
+require "bundler/setup"
+require "rack"
+require "rackup"
+
+root = File.expand_path("..", __dir__)
+Dir.chdir(root)
+
+port = ENV.fetch("PORT", "9292")
+host = ENV.fetch("HOST", "127.0.0.1")
+
+puts "Grok Lens → http://#{host}:#{port}  (GROK_HOME=#{ENV.fetch('GROK_HOME', File.expand_path('~/.grok'))})"
+Rackup::Server.start(
+  config: File.join(root, "config.ru"),
+  Host: host,
+  Port: port.to_i
+)

@@ -1,0 +1,95 @@
+<% @title = "#{@session.title} · Grok Lens" %>
+
+<% project = @snap.projects.find { |p| p.path == @session.cwd } %>
+<nav class="crumb">
+  <a href="/">Home</a>
+  <% if project %>
+    · <a href="/projects/<%= h(project.id) %>"><%= h(project.name) %></a>
+  <% end %>
+  · session
+</nav>
+
+<header class="detail-header">
+  <div class="row">
+    <span class="dot <%= @session.status %>"></span>
+    <span class="status-text"><%= status_label(@session.status) %></span>
+    <% if @session.session_kind %><span class="badge"><%= h(@session.session_kind) %></span><% end %>
+    <% if @session.agent_name %><span class="badge"><%= h(@session.agent_name) %></span><% end %>
+  </div>
+  <h1><%= h(@session.title) %></h1>
+  <p class="mono path"><%= h(short_path(@session.cwd)) %></p>
+  <% if @session.summary_text && !@session.summary_text.empty? && @session.summary_text != @session.title %>
+    <p class="desc"><%= h(@session.summary_text) %></p>
+  <% end %>
+
+  <div class="meta-grid">
+    <div><span class="label">Model</span><span><%= h(@session.current_model_id) %></span></div>
+    <div><span class="label">Models used</span><span><%= h(@session.models.join(", ")) %></span></div>
+    <div><span class="label">Est. tokens</span><span class="num"><%= est(@session.est_tokens) %></span></div>
+    <div><span class="label">Disk</span><span class="num"><%= bytes(@session.disk_bytes) %></span></div>
+    <div><span class="label">Turns</span><span class="num"><%= @session.num_turns %></span></div>
+    <div><span class="label">Messages</span><span class="num"><%= @session.num_messages %></span></div>
+    <div><span class="label">Chat msgs</span><span class="num"><%= @session.num_chat_messages %></span></div>
+    <div><span class="label">Created</span><span class="num"><%= @session.created_at&.strftime("%Y-%m-%d %H:%M") || "—" %></span></div>
+    <div><span class="label">Last active</span><span class="num"><%= @session.last_active_at&.strftime("%Y-%m-%d %H:%M") || "—" %></span></div>
+    <% if @session.pid %><div><span class="label">PID</span><span class="num"><%= @session.pid %></span></div><% end %>
+    <% if @session.git_branch %><div><span class="label">Branch</span><span class="mono"><%= h(@session.git_branch) %></span></div><% end %>
+    <% if @session.git_commit %><div><span class="label">Commit</span><span class="mono"><%= h(@session.git_commit[0, 10]) %></span></div><% end %>
+  </div>
+
+  <p class="id-line muted">
+    id <code id="session-id"><%= h(@session.id) %></code>
+    <button type="button" class="btn small" data-copy="#session-id">Copy</button>
+  </p>
+</header>
+
+<% if @session.first_user_prompt && !@session.first_user_prompt.empty? %>
+<section class="block">
+  <h2 class="section-title">First user prompt</h2>
+  <blockquote class="prompt"><%= h(@session.first_user_prompt) %></blockquote>
+</section>
+<% end %>
+
+<section class="split-detail">
+  <div>
+    <h2 class="section-title">Tool calls</h2>
+    <%= tool_bars(@session.tool_counts) %>
+  </div>
+  <div>
+    <h2 class="section-title">Activity</h2>
+    <% if @session.activity_points.any? %>
+      <div class="spark-wrap"><%= sparkline_svg(@session.activity_points, width: 280, height: 40) %></div>
+      <p class="muted sub">Event density across the session (sparkline, not wall-clock).</p>
+    <% else %>
+      <p class="muted">No event timeline available.</p>
+    <% end %>
+  </div>
+</section>
+
+<% if @session.children.any? %>
+<section class="block">
+  <h2 class="section-title">Subagents</h2>
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Model</th>
+        <th class="r">Msgs</th>
+        <th class="r">Est. tok</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @session.children.each do |c| %>
+        <tr>
+          <td><a href="/sessions/<%= h(c.id) %>"><%= h(c.title) %></a></td>
+          <td><%= h(c.current_model_id) %></td>
+          <td class="r num"><%= c.num_messages %></td>
+          <td class="r num"><%= est(c.est_tokens) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+<% end %>
+
+<p class="note muted">Skim view only — full transcripts are not loaded (some sessions exceed hundreds of MB).</p>
