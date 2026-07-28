@@ -1,51 +1,108 @@
 # Grok Lens
 
-Local, read-only dashboard for **Grok Build** sessions and projects under `~/.grok`.
+[![CI](https://github.com/monomyth/grok-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/monomyth/grok-lens/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ruby](https://img.shields.io/badge/Ruby-%3E%3D%204.0-red.svg)](https://www.ruby-lang.org/)
 
-Ruby **4.x** · Sinatra · Tufte-inspired dense UI · snapshot on start (live polling is a future TODO).
+Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions and projects stored under `~/.grok`.
+
+Ruby **4.x** · Sinatra · Tufte-inspired dense UI · snapshot on start
+
+> **Privacy:** Session data can include prompts and code. Grok Lens binds to `127.0.0.1` by default and never writes to `~/.grok`. See [SECURITY.md](SECURITY.md).
+
+## Features
+
+- **Projects** grouped by session working directory — path, short description, model mix, est. tokens
+- **Sessions** with status (**live** / **stale** / **idle**), title, model, turns, est. tokens
+- **Nested subagents** under parent sessions
+- **Session skim** — first user prompt, tool histogram, activity sparkline (not a full chat viewer)
+- Manual **Refresh** to re-scan disk (live polling is a future enhancement)
+
+Token counts are **estimates** derived from on-disk artifact sizes (`chat_history` + `events`). Grok does not currently persist API token usage in session files.
 
 ## Requirements
 
-- Ruby **>= 4.0**
+- **Ruby >= 4.0**
 - Bundler
 
 ```bash
-ruby -v   # must be 4.x
+ruby -v   # must report 4.x
 ```
 
-## Run
+## Install & run
 
 ```bash
+git clone https://github.com/monomyth/grok-lens.git
 cd grok-lens
 bundle install
 bundle exec rackup -o 127.0.0.1 -p 9292
 # or
-chmod +x bin/grok-lens && bin/grok-lens
+bin/grok-lens
 ```
 
 Open **http://127.0.0.1:9292**
 
-Optional:
+### Options
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `GROK_HOME` | `~/.grok` | Root of Grok Build data |
+| `HOST` | `127.0.0.1` | Bind address |
+| `PORT` | `9292` | HTTP port |
 
 ```bash
 GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
 ```
 
-## What it shows
+## Screenshots
 
-- **Projects** (by session cwd) with path, short description, model mix, est. tokens
-- **Sessions** with status (live / stale / idle), title, model, turns, est. tokens
-- **Nested subagents** under parent sessions
-- **Session skim**: first user prompt, tool histogram, activity sparkline — not full chat
+_Add a screenshot of the dual-home dashboard here after first release (`docs/images/home.png`)._
 
-Token counts are **estimates** from on-disk artifact sizes (`chat_history` + `events`). Grok does not currently store API token usage in session files.
+## Data sources (read-only)
 
-## Tests
+| Path | Use |
+|------|-----|
+| `~/.grok/sessions/<cwd>/<id>/summary.json` | Titles, models, message counts, times |
+| `events.jsonl` | Models per turn, tools, activity |
+| `chat_history.jsonl` | First user prompt; size for token estimate |
+| `active_sessions.json` | Active session IDs and PIDs |
+| `sessions/session_search.sqlite` | Optional title fallback |
+| Project `README.md` | Optional project description |
+
+## Development
 
 ```bash
-bundle exec ruby -Itest test/store_test.rb test/app_test.rb
+bundle install
+bundle exec rake test
+bundle exec rackup -o 127.0.0.1 -p 9292
 ```
 
-## Layout
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-See `docs/superpowers/specs/2026-07-14-grok-lens-design.md`.
+## Project layout
+
+```
+grok-lens/
+  bin/grok-lens          # launcher
+  config.ru
+  lib/grok_lens/         # store, models, app
+  views/                 # ERB
+  public/                # CSS + minimal JS
+  test/                  # Minitest fixtures
+  docs/                  # design notes
+```
+
+## Roadmap (not in v0.1)
+
+- Soft live poll for active sessions
+- Full-text search UI over the session search index
+- Real token telemetry when Grok writes usage fields
+- Optional “open cwd in terminal”
+
+## License
+
+[MIT](LICENSE)
+
+## Disclaimer
+
+Grok Lens is an independent community tool. It is not affiliated with or endorsed by xAI. “Grok” and related marks belong to their respective owners.

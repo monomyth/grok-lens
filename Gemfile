@@ -9,7 +9,8 @@ gem "puma", "~> 6.6"
 gem "rackup", "~> 2.2"
 gem "sqlite3", "~> 2.6"
 
-group :test do
+group :development, :test do
+  gem "rake", "~> 13.2"
   gem "minitest", "~> 5.25"
   gem "rack-test", "~> 2.2"
 end

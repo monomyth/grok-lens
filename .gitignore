@@ -4,3 +4,12 @@ vendor/bundle/
 *.gem
 .DS_Store
 .superpowers/
+.idea/
+.vscode/
+*.swp
+*~
+coverage/
+.env
+.env.*
+!.env.example
+

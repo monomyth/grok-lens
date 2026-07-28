@@ -3,7 +3,7 @@
 **Date:** 2026-07-14  
 **Status:** Approved for implementation planning  
 **Working name:** `grok-lens`  
-**Location:** `/Users/monomyth/code/grok/grok-lens/`
+**Location:** repository root (`grok-lens/`)
 
 ## Problem
 
