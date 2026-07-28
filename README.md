@@ -56,7 +56,9 @@ GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
 
 ## Screenshots
 
-_Add a screenshot of the dual-home dashboard here after first release (`docs/images/home.png`)._
+Dual-home dashboard (synthetic demo data — not real session history):
+
+![Grok Lens home dashboard](docs/images/home.png)
 
 ## Data sources (read-only)
 
