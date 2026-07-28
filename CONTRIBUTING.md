@@ -38,6 +38,6 @@ GROK_HOME=/path/to/fixture bundle exec rackup -o 127.0.0.1 -p 9292
 
 ## Pull requests
 
-1. Fork and branch from `main` / `master`
+1. Fork and branch from `master`
 2. Ensure `bundle exec rake test` passes
 3. Describe the change and any screenshots for UI work
