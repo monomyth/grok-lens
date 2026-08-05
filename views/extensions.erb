@@ -1,0 +1,73 @@
+<% @title = "Plugins & skills · Grok Lens" %>
+
+<header class="detail-header">
+  <h1>Installed plugins &amp; skills</h1>
+  <p class="desc">
+    Read from <code><%= h(short_path(grok_home_path)) %></code>
+    (<code>skills/</code>, <code>bundled/skills/</code>, <code>installed-plugins/</code>).
+  </p>
+  <div class="meta-grid">
+    <div><span class="label">Plugins</span><span class="num"><%= @counts[:plugins] %></span></div>
+    <div><span class="label">Skills</span><span class="num"><%= @counts[:skills] %></span></div>
+    <div><span class="label">Slash-invocable</span><span class="num"><%= @counts[:invocable_skills] %></span></div>
+  </div>
+  <input type="search" id="ext-filter" class="filter wide" placeholder="Filter plugins and skills…" aria-label="Filter extensions">
+</header>
+
+<section class="block">
+  <h2 class="section-title">Plugins</h2>
+  <% if @plugins.empty? %>
+    <p class="muted">No plugins under <code>installed-plugins/</code>.</p>
+  <% else %>
+    <table class="ledger" id="plugins-table">
+      <thead>
+        <tr>
+          <th>Plugin</th>
+          <th class="r">Skills</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @plugins.each do |p| %>
+          <tr data-filter="<%= h("#{p.name} #{p.id} #{p.description}") %>">
+            <td>
+              <strong><%= h(p.name) %></strong>
+              <div class="subline muted mono"><%= h(p.id) %></div>
+            </td>
+            <td class="r num"><%= p.skill_count %></td>
+            <td><%= h(p.description) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
+
+<section class="block">
+  <h2 class="section-title">Skills</h2>
+  <table class="ledger" id="skills-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Source</th>
+        <th>Slash</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @skills.each do |s| %>
+        <tr data-filter="<%= h("#{s.name} #{s.source} #{s.plugin} #{s.description}") %>">
+          <td class="mono">
+            <% if s.user_invocable %><code>/<%= h(s.name) %></code><% else %><%= h(s.name) %><% end %>
+          </td>
+          <td>
+            <span class="badge"><%= h(s.source) %></span>
+            <% if s.plugin %><span class="muted mono"><%= h(s.plugin) %></span><% end %>
+          </td>
+          <td><%= s.user_invocable ? "yes" : "no" %></td>
+          <td><%= h(s.description) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>

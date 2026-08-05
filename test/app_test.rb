@@ -13,7 +13,9 @@ class AppTest < Minitest::Test
     @home = File.join(ROOT, "tmp", "fixture-home-app")
     @ids = FixtureHelper.build_fixture_home(@home)
     GrokLens::App.set :store, GrokLens::Store.new(grok_home: @home)
+    GrokLens::App.set :catalog, GrokLens::Catalog.new(grok_home: @home)
     GrokLens::App.set :snapshot, nil
+    GrokLens::App.set :last_scan_ms, nil
   end
 
   def test_home_ok
@@ -54,4 +56,33 @@ class AppTest < Minitest::Test
     get "/sessions/00000000-0000-0000-0000-000000000000"
     assert_equal 404, last_response.status
   end
+
+  def test_session_has_resume_command
+    get "/sessions/#{@ids[:parent_id]}"
+    assert last_response.ok?
+    assert_match(/grok --cwd/, last_response.body)
+    assert_match(/--resume/, last_response.body)
+    assert_match(/Copy resume/, last_response.body)
+  end
+
+  def test_api_snapshot
+    get "/api/snapshot?refresh=1"
+    assert last_response.ok?
+    body = JSON.parse(last_response.body)
+    assert body["ok"]
+    assert body["primary_sessions"].positive?
+    assert body.key?("scan_ms")
+  end
+
+  def test_glossary_and_extensions_routes
+    # catalog against real or empty home is fine; routes must 200
+    get "/glossary"
+    assert last_response.ok?
+    assert_match(/glossary/i, last_response.body)
+
+    get "/extensions"
+    assert last_response.ok?
+    assert_match(/Plugins/i, last_response.body)
+  end
 end
+

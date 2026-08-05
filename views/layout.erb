@@ -4,27 +4,58 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= @title || "Grok Lens" %></title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("grok-lens-theme") || "system";
+        var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme-pref", t);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body
+  data-poll-default="<%= poll_seconds_default %>"
+  data-page="<%= request.path_info %>"
+>
   <div class="page">
     <header class="site-header">
       <div class="brand">
         <a href="/" class="logo">Grok Lens</a>
         <% if @snap %>
-          <span class="meta">snapshot · <%= @snap.scanned_at.utc.strftime("%Y-%m-%d %H:%M UTC") %></span>
+          <span class="meta" id="snapshot-meta">snapshot · <%= @snap.scanned_at.utc.strftime("%Y-%m-%d %H:%M UTC") %><% if settings.last_scan_ms %> · <%= settings.last_scan_ms %>ms<% end %></span>
         <% end %>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/" class="<%= nav_active("/") %>">Home</a>
+          <a href="/glossary" class="<%= nav_active("/glossary") %>">Glossary</a>
+          <a href="/extensions" class="<%= nav_active("/extensions") %>">Plugins &amp; skills</a>
+        </nav>
       </div>
       <div class="header-stats">
         <% if @snap && !@snap.missing_home %>
-          <span class="num"><%= @snap.primary_sessions.size %></span> sessions
+          <span class="num" id="stat-sessions"><%= @snap.primary_sessions.size %></span> sessions
           <span class="sep">·</span>
-          <span class="num"><%= @snap.projects.size %></span> projects
+          <span class="num" id="stat-projects"><%= @snap.projects.size %></span> projects
           <span class="sep">·</span>
-          <span class="num"><%= est(@snap.total_est_tokens) %></span> est. tokens
+          <span class="num" id="stat-tokens"><%= est(@snap.total_est_tokens) %></span> est. tokens
         <% end %>
+        <label class="poll-control" title="Auto-refresh interval (client-side). Scans are typically 20–40ms.">
+          <span class="muted">Poll</span>
+          <select id="poll-interval" aria-label="Polling interval">
+            <% poll_presets.each do |secs, label| %>
+              <option value="<%= secs %>" <%= secs == poll_seconds_default ? "selected" : "" %>><%= label %></option>
+            <% end %>
+          </select>
+        </label>
+        <div class="theme-switch" role="group" aria-label="Color theme">
+          <button type="button" class="btn small theme-btn" data-theme-set="light" title="Light">Light</button>
+          <button type="button" class="btn small theme-btn" data-theme-set="system" title="System">Auto</button>
+          <button type="button" class="btn small theme-btn" data-theme-set="dark" title="Dark">Dark</button>
+        </div>
         <form class="inline" action="/refresh" method="post">
-          <button type="submit" class="btn">Refresh</button>
+          <button type="submit" class="btn" id="refresh-btn">Refresh</button>
         </form>
       </div>
     </header>
@@ -34,11 +65,11 @@
     </main>
 
     <footer class="site-footer">
-      <span>v<%= GrokLens::VERSION %> · Ruby <%= RUBY_VERSION %> · read-only <%= h(@snap&.grok_home || ENV.fetch("GROK_HOME", "~/.grok")) %></span>
+      <span>v<%= GrokLens::VERSION %> · Ruby <%= RUBY_VERSION %> · read-only <%= h(@snap&.grok_home || grok_home_path) %></span>
       <% if @snap && @snap.warnings.any? %>
         <span class="warn"><%= @snap.warnings.size %> warning<%= @snap.warnings.size == 1 ? "" : "s" %></span>
       <% end %>
-      <span class="muted">Token figures are estimates (not API usage). Live polling: TODO.</span>
+      <span class="muted" id="poll-status">Token figures are estimates (not API usage).</span>
     </footer>
   </div>
   <script src="/app.js"></script>

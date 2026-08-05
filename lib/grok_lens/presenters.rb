@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "cgi"
+require "shellwords"
 require "time"
 
 module GrokLens
@@ -9,6 +10,25 @@ module GrokLens
 
     def h(text)
       CGI.escape_html(text.to_s)
+    end
+
+    # CLI to reopen a session in Grok Build TUI.
+    # Prefer UUID resume with explicit cwd so it works outside the original directory.
+    def resume_command(session)
+      cwd = session.cwd.to_s
+      id = session.id.to_s
+      if cwd.empty?
+        "grok --resume #{Shellwords.escape(id)}"
+      else
+        "grok --cwd #{Shellwords.escape(cwd)} --resume #{Shellwords.escape(id)}"
+      end
+    end
+
+    def continue_command(session)
+      cwd = session.cwd.to_s
+      return "grok --continue" if cwd.empty?
+
+      "grok --cwd #{Shellwords.escape(cwd)} --continue"
     end
 
     def short_path(path, home: Dir.home)

@@ -16,7 +16,10 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI · snapshot on start
 - **Sessions** with status (**live** / **stale** / **idle**), title, model, turns, est. tokens
 - **Nested subagents** under parent sessions
 - **Session skim** — first user prompt, tool histogram, activity sparkline (not a full chat viewer)
-- Manual **Refresh** to re-scan disk (live polling is a future enhancement)
+- **Light / dark / system** theme
+- Copy **session id** and ready-to-paste **`grok --cwd … --resume <id>`**
+- **Live polling** (default 5 minutes; 30s–10m or off — scans are typically 20–40ms)
+- **Slash-command glossary** and **installed plugins & skills** inventory
 
 Token counts are **estimates** derived from on-disk artifact sizes (`chat_history` + `events`). Grok does not currently persist API token usage in session files.
 
@@ -49,6 +52,7 @@ Open **http://127.0.0.1:9292**
 | `GROK_HOME` | `~/.grok` | Root of Grok Build data |
 | `HOST` | `127.0.0.1` | Bind address |
 | `PORT` | `9292` | HTTP port |
+| `GROK_LENS_POLL_SECONDS` | `300` | Default auto-refresh interval (UI can override; `0` = off) |
 
 ```bash
 GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
@@ -94,12 +98,12 @@ grok-lens/
   docs/                  # design notes
 ```
 
-## Roadmap (not in v0.1)
+## Roadmap
 
-- Soft live poll for active sessions
 - Full-text search UI over the session search index
 - Real token telemetry when Grok writes usage fields
-- Optional “open cwd in terminal”
+- Optional “open cwd in terminal” / deep-link helpers
+- Partial DOM updates on poll (avoid full reload when lists change)
 
 ## License
 

@@ -1,0 +1,49 @@
+<% @title = "Slash command glossary · Grok Lens" %>
+
+<header class="detail-header">
+  <h1>Grok slash command glossary</h1>
+  <p class="desc">
+    Built-in <code>/</code> commands from the Grok Build user guide
+    <% if File.file?(@doc_path) %>
+      (<code><%= h(short_path(@doc_path)) %></code>)
+    <% else %>
+      (bundled fallback — install docs under <code>~/.grok/docs</code> for the full list)
+    <% end %>.
+    Skills also appear as slash commands when <code>user-invocable</code>; see
+    <a href="/extensions">Plugins &amp; skills</a>.
+  </p>
+  <div class="meta-grid">
+    <div><span class="label">Commands</span><span class="num"><%= @commands.size %></span></div>
+  </div>
+  <input type="search" id="glossary-filter" class="filter wide" placeholder="Filter commands…" aria-label="Filter glossary">
+</header>
+
+<% @commands.group_by(&:section).each do |section, cmds| %>
+<section class="block glossary-section" data-section="<%= h(section) %>">
+  <h2 class="section-title"><%= h(section) %></h2>
+  <table class="ledger glossary-table">
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Aliases</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% cmds.each do |c| %>
+        <tr data-filter="<%= h("#{c.name} #{c.aliases.join(" ")} #{c.description} #{c.section}") %>">
+          <td class="mono"><code><%= h(c.name) %></code></td>
+          <td class="mono muted"><%= c.aliases.any? ? h(c.aliases.join(", ")) : "—" %></td>
+          <td><%= h(c.description) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+<% end %>
+
+<p class="note muted">
+  CLI resume (outside the TUI): <code>grok --cwd /path/to/project --resume &lt;session-id&gt;</code>
+  or <code>grok --continue</code> for the latest session in a directory.
+  Full docs: <code>~/.grok/docs/user-guide/04-slash-commands.md</code>.
+</p>
