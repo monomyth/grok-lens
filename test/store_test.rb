@@ -56,6 +56,20 @@ class StoreTest < Minitest::Test
     assert_equal "hello world", @store.send(:scrub_prompt_wrappers, nested)
   end
 
+  def test_running_tasks_detects_live_bg_via_port
+    store = GrokLens::Store.new(grok_home: @home)
+    store.define_singleton_method(:port_listening?) { |port| port.to_i == 19_876 }
+    store.define_singleton_method(:process_command_index) { ["python3 -m http.server 19876"] }
+    snap = store.scan
+    parent = snap.session(@ids[:parent_id])
+    assert parent.running_count.positive?, "expected live bg task"
+    titles = parent.running_tasks.map(&:title).join(" ")
+    assert_match(/demo static server|http.server|19876/i, titles)
+    # completed bg must not appear
+    refute parent.running_tasks.any? { |t| t.id == "call-dead-1" }
+  end
+
+
   def test_process_discovery_marks_live_resume
     store = GrokLens::Store.new(grok_home: @home)
     live_pid = Process.pid

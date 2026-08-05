@@ -185,6 +185,10 @@ module GrokLens
           est_tokens_label: Estimate.format_tokens(s.est_tokens),
           last_active_at: s.last_active_at&.utc&.iso8601,
           children: s.children.size,
+          running_count: s.running_count,
+          running_tasks: Array(s.running_tasks).select(&:live).map { |t|
+            { id: t.id, kind: t.kind.to_s, title: t.title, status: t.status, tool_name: t.tool_name }
+          },
           resume_command: resume_command(s),
           continue_command: continue_command(s)
         }

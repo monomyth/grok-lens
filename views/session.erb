@@ -49,6 +49,33 @@
   </div>
 </header>
 
+<% if @session.running_count.positive? %>
+<section class="block">
+  <h2 class="section-title">Running now <span class="muted num">(<%= @session.running_count %>)</span></h2>
+  <table class="ledger">
+    <thead>
+      <tr>
+        <th>Kind</th>
+        <th>Task</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @session.running_tasks.select(&:live).each do |t| %>
+        <tr>
+          <td><span class="badge"><%= h(t.kind) %></span></td>
+          <td>
+            <%= h(t.title) %>
+            <% if t.tool_name %><div class="subline muted mono"><%= h(t.tool_name) %></div><% end %>
+          </td>
+          <td><span class="dot active"></span><%= h(t.status) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+<% end %>
+
 <% if @session.first_user_prompt && !@session.first_user_prompt.empty? %>
 <section class="block">
   <h2 class="section-title">Opening message</h2>

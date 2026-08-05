@@ -64,6 +64,59 @@ module FixtureHelper
       { ts: "2026-07-01T10:01:00Z", type: "turn_started", model_id: "grok-4.5", turn_number: 1 }.to_json
     ].join("\n") + "\n")
 
+    # One completed bg tool + one still-running bg tool (live via port 19876)
+    File.write(File.join(parent_dir, "updates.jsonl"), [
+      {
+        timestamp: Time.now.to_i - 60,
+        method: "session/update",
+        params: {
+          sessionId: parent_id,
+          update: {
+            sessionUpdate: "tool_call",
+            toolCallId: "call-dead-1",
+            title: "[bg] sleep 1 (019fdead)",
+            rawInput: { command: "sleep 1", background: true, description: "old finished" }
+          }
+        }
+      }.to_json,
+      {
+        timestamp: Time.now.to_i - 30,
+        method: "session/update",
+        params: {
+          sessionId: parent_id,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "call-dead-1",
+            status: "completed"
+          }
+        }
+      }.to_json,
+      {
+        timestamp: Time.now.to_i,
+        method: "session/update",
+        params: {
+          sessionId: parent_id,
+          update: {
+            sessionUpdate: "tool_call",
+            toolCallId: "call-live-bg",
+            title: "[bg] python3 -m http.server 19876 (019flive)",
+            status: "in_progress",
+            rawInput: {
+              command: "python3 -m http.server 19876",
+              background: true,
+              description: "demo static server"
+            },
+            _meta: {
+              "x.ai/tool" => {
+                "name" => "run_terminal_command",
+                "input" => { "command" => "python3 -m http.server 19876", "background" => true }
+              }
+            }
+          }
+        }
+      }.to_json
+    ].join("\n") + "\n")
+
     File.write(File.join(child_dir, "chat_history.jsonl"), "x" * 400)
     File.write(File.join(idle_dir, "chat_history.jsonl"), "y" * 200)
 

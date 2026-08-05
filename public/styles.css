@@ -309,6 +309,10 @@ form.inline { display: inline; margin: 0; }
   color: var(--muted);
   white-space: nowrap;
 }
+.badge.live-tasks {
+  border-color: var(--ink);
+  color: var(--ink);
+}
 
 .dual {
   display: grid;

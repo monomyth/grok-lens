@@ -52,10 +52,24 @@ module GrokLens
       end
 
       nest!(sessions)
+      # Attach live running tasks (bg tools / in-flight work) for live sessions only —
+      # avoids scanning multi‑MB updates.jsonl for every idle archive.
+      ps_index = process_command_index
+      sessions.map! do |s|
+        next s unless s.active?
+
+        dir = session_dir_for(s)
+        next s unless dir
+
+        tasks = load_running_tasks(dir, s, ps_index)
+        s.with(running_tasks: tasks)
+      end
+
       sessions_by_id = sessions.to_h { |s| [s.id, s] }
       primaries = sessions.select(&:primary?).sort_by { |s| s.last_active_at || s.created_at || Time.at(0) }.reverse
       projects = build_projects(primaries, warnings)
-      active = primaries.select { |s| s.active? || s.stale? }.sort_by { |s| s.opened_at || s.last_active_at || Time.at(0) }.reverse
+      active = primaries.select { |s| s.active? || s.stale? || s.running_count.positive? }
+                        .sort_by { |s| s.opened_at || s.last_active_at || Time.at(0) }.reverse
 
       total_est = sessions.sum { |s| s.est_tokens.to_i }
       models_hist = Hash.new(0)
@@ -109,12 +123,18 @@ module GrokLens
         first_prompt = extract_first_user_prompt(chat_path)
       end
 
+      tasks = session.running_tasks
+      if tasks.nil? || tasks.empty?
+        tasks = load_running_tasks(dir, session, process_command_index)
+      end
+
       session.with(
         models: models.compact.uniq,
         tool_counts: tool_counts,
         first_user_prompt: first_prompt,
         activity_points: downsample(activity, 48),
-        detail_loaded: true
+        detail_loaded: true,
+        running_tasks: tasks
       )
     end
 
@@ -281,8 +301,197 @@ module GrokLens
         git_branch: summary["head_branch"],
         git_commit: summary["head_commit"],
         activity_points: [],
-        detail_loaded: false
+        detail_loaded: false,
+        running_tasks: []
       )
+    end
+
+    TERMINAL_STATUSES = %w[completed failed cancelled error rejected success].freeze
+    FOREGROUND_STALE_SECS = 180
+
+    def load_running_tasks(session_dir, session, ps_index = nil)
+      ps_index ||= process_command_index
+      tasks = []
+      updates = File.join(session_dir, "updates.jsonl")
+      if File.file?(updates)
+        open_calls = parse_open_tool_calls(updates)
+        open_calls.each do |cid, info|
+          live = task_live?(info, ps_index, session)
+          next unless live || info[:bg] # still show bg only if live; skip dead
+
+          next unless live
+
+          title = short_task_title(info)
+          kind = info[:bg] ? :bg_shell : :tool
+          tasks << RunningTask.new(
+            id: cid,
+            kind: kind,
+            title: title,
+            status: info[:status].to_s.empty? ? "running" : info[:status].to_s,
+            tool_name: info[:tool_name],
+            live: true
+          )
+        end
+      end
+
+      # Live subagents under this session
+      Array(session.children).each do |child|
+        next unless child.active?
+
+        tasks << RunningTask.new(
+          id: child.id,
+          kind: :subagent,
+          title: child.title.to_s.empty? ? "subagent #{child.id[0, 8]}" : child.title,
+          status: "live",
+          tool_name: child.current_model_id,
+          live: true
+        )
+      end
+
+      tasks
+    rescue StandardError
+      []
+    end
+
+    def parse_open_tool_calls(updates_path, max_bytes: 2_500_000)
+      size = File.size(updates_path)
+      start = size > max_bytes ? size - max_bytes : 0
+      data = File.open(updates_path, "rb") do |f|
+        f.seek(start)
+        f.read
+      end.to_s
+      # drop partial first line when mid-file
+      data = data.split("\n", 2).last if start.positive?
+
+      calls = {}
+      data.each_line do |line|
+        line = line.strip
+        next if line.empty?
+
+        begin
+          obj = JSON.parse(line)
+        rescue JSON::ParserError
+          next
+        end
+
+        update = obj.dig("params", "update") || {}
+        su = update["sessionUpdate"]
+        next unless su == "tool_call" || su == "tool_call_update"
+
+        cid = update["toolCallId"]
+        next unless cid
+
+        info = calls[cid] || { first_ts: obj["timestamp"], last_ts: obj["timestamp"] }
+        info[:last_ts] = obj["timestamp"] if obj["timestamp"]
+        info[:title] = update["title"] if update["title"]
+        info[:status] = update["status"] if update["status"]
+        raw = update["rawInput"]
+        if raw.is_a?(Hash)
+          info[:command] = raw["command"].to_s if raw["command"]
+          info[:description] = raw["description"].to_s if raw["description"]
+          info[:bg] = true if raw["background"] == true || raw["background"].to_s == "true"
+        end
+        meta = update["_meta"]
+        if meta.is_a?(Hash)
+          tool = meta["x.ai/tool"] || meta["tool"]
+          if tool.is_a?(Hash)
+            info[:tool_name] = tool["name"] || tool["label"]
+            input = tool["input"]
+            if input.is_a?(Hash)
+              info[:command] ||= input["command"].to_s
+              info[:description] ||= input["description"].to_s
+              info[:bg] = true if input["background"] == true
+            end
+          end
+        end
+        title = info[:title].to_s
+        info[:bg] = true if title.include?("[bg") || title.match?(/\(0[0-9a-f]{7}/i)
+        calls[cid] = info
+      end
+
+      # drop finished
+      calls.reject! do |_cid, info|
+        TERMINAL_STATUSES.include?(info[:status].to_s.downcase)
+      end
+      calls
+    end
+
+    def task_live?(info, ps_index, session)
+      if info[:bg] || info[:tool_name].to_s == "run_terminal_command"
+        return command_appears_running?(info, ps_index)
+      end
+
+      # Foreground tools: only if session process is live and stamp is fresh
+      return false unless session.active?
+
+      ts = info[:last_ts]
+      return true if ts.nil?
+
+      age = Time.now.to_i - ts.to_i
+      age = age.abs # clock skew guard
+      age <= FOREGROUND_STALE_SECS
+    end
+
+    def command_appears_running?(info, ps_index)
+      cmd = info[:command].to_s
+      title = info[:title].to_s
+      hay = "#{cmd}\n#{title}"
+
+      # Port listeners (rackup/puma etc.)
+      hay.scan(/\b(\d{4,5})\b/).flatten.uniq.each do |port|
+        next unless port.to_i.between?(1024, 65_535)
+        return true if port_listening?(port)
+      end
+
+      # Distinctive command needles against process table
+      needles = []
+      cmd.each_line do |line|
+        line = line.strip
+        next if line.empty? || line.start_with?("#")
+        next if line.length < 24
+        next if line.match?(/\A(export|cd|sleep|echo|PIDS=|if |for |then|fi|done|true|false)\b/)
+
+        needles << line[0, 48]
+      end
+      if needles.empty? && title.length > 20
+        # strip [bg] prefix and trailing task id
+        t = title.sub(/\A\[bg\]\s*/i, "").sub(/\s*\(0[0-9a-f]{7}[^)]*\)\s*\z/i, "")
+        needles << t[0, 48] if t.length >= 24
+      end
+
+      needles.any? { |n| ps_index.any? { |line| line.include?(n) } }
+    end
+
+    def port_listening?(port)
+      # Prefer lsof; fall back to ps needle
+      out = `lsof -nP -iTCP:#{port} -sTCP:LISTEN 2>/dev/null`
+      return true if out && !out.strip.empty?
+
+      ps_index = process_command_index
+      ps_index.any? { |l| l.include?(":#{port}") || l.include?(" #{port}") }
+    rescue StandardError
+      false
+    end
+
+    def process_command_index
+      @process_command_index ||= begin
+        out = `ps -ax -o command= 2>/dev/null`
+        out.to_s.each_line.map(&:strip).reject(&:empty?)
+      rescue StandardError
+        []
+      end
+    end
+
+    def short_task_title(info)
+      if info[:description].to_s.strip != ""
+        return clip_sentence(info[:description], 100)
+      end
+
+      title = info[:title].to_s.sub(/\A\[bg\]\s*/i, "")
+      title = title.sub(/\s*\(0[0-9a-f]{7}[^)]*\)\s*\z/i, "")
+      # collapse multi-line shell into first useful line
+      line = title.each_line.map(&:strip).find { |l| !l.empty? && !l.start_with?("#") } || title
+      clip_sentence(line, 100)
     end
 
     def nest!(sessions)

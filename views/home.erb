@@ -39,6 +39,7 @@
         <th>Project</th>
         <th>Title</th>
         <th>Model</th>
+        <th class="r">Running</th>
         <th class="r">Turns</th>
         <th class="r">Est. tok</th>
       </tr>
@@ -50,12 +51,14 @@
           <td class="mono"><%= h(File.basename(s.cwd.to_s)) %></td>
           <td><a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
             <% if s.children.any? %><span class="badge">+<%= s.children.size %> sub</span><% end %>
+            <% if s.running_count.positive? %><span class="badge live-tasks"><%= s.running_count %> running</span><% end %>
             <div class="row actions">
               <button type="button" class="btn small" data-copy-text="<%= h(s.id) %>" title="Copy session id">Id</button>
               <button type="button" class="btn small" data-copy-text="<%= h(resume_command(s)) %>" title="Copy grok --resume command">Resume</button>
             </div>
           </td>
           <td><%= h(s.current_model_id || s.models.first) %></td>
+          <td class="r num"><%= s.running_count.positive? ? s.running_count : "—" %></td>
           <td class="r num"><%= s.num_turns %></td>
           <td class="r num"><%= est(s.est_tokens) %></td>
         </tr>
@@ -97,6 +100,7 @@
             <td>
               <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
               <% if s.children.any? %><span class="badge">+<%= s.children.size %> sub</span><% end %>
+              <% if s.running_count.positive? %><span class="badge live-tasks"><%= s.running_count %> running</span><% end %>
               <div class="subline muted"><%= h(File.basename(s.cwd.to_s)) %> · <%= h(s.current_model_id) %> · <%= s.num_turns %> turns · <%= s.num_messages %> msgs</div>
               <div class="row actions">
                 <button type="button" class="btn small" data-copy-text="<%= h(s.id) %>">Id</button>

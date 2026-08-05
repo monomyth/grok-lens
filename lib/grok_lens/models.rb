@@ -3,6 +3,16 @@
 require "time"
 
 module GrokLens
+  # In-flight work unit for a session (bg shell, tool call, live subagent).
+  RunningTask = Data.define(
+    :id,
+    :kind,        # :bg_shell | :tool | :subagent
+    :title,
+    :status,
+    :tool_name,
+    :live
+  )
+
   Session = Data.define(
     :id,
     :cwd,
@@ -30,7 +40,8 @@ module GrokLens
     :git_branch,
     :git_commit,
     :activity_points,
-    :detail_loaded
+    :detail_loaded,
+    :running_tasks
   ) do
     def primary?
       # Top-level ledger rows: anything without a known parent (orphan subagents included)
@@ -43,6 +54,10 @@ module GrokLens
 
     def stale?
       status == :stale
+    end
+
+    def running_count
+      Array(running_tasks).count { |t| t.live }
     end
 
     def with(**changes)
