@@ -142,25 +142,66 @@ module GrokLens
     end
 
     def load_active(warnings)
-      path = File.join(@grok_home, "active_sessions.json")
-      return {} unless File.file?(path)
-
-      data = JSON.parse(File.read(path))
       map = {}
-      Array(data).each do |row|
-        id = row["session_id"]
-        next unless id
+      path = File.join(@grok_home, "active_sessions.json")
+      if File.file?(path)
+        begin
+          data = JSON.parse(File.read(path))
+          Array(data).each do |row|
+            id = row["session_id"]
+            next unless id
 
-        map[id] = {
-          pid: row["pid"],
-          cwd: row["cwd"],
-          opened_at: parse_time(row["opened_at"])
-        }
+            map[id] = {
+              pid: row["pid"],
+              cwd: row["cwd"],
+              opened_at: parse_time(row["opened_at"]),
+              source: "active_sessions"
+            }
+          end
+        rescue StandardError => e
+          warnings << "active_sessions.json: #{e.message}"
+        end
       end
+
+      # Grok sometimes leaves a live process out of active_sessions.json
+      # (e.g. `grok --resume <uuid>`). Discover those from the process table.
+      discover_live_from_processes(map, warnings)
       map
+    end
+
+    UUID_INLINE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
+    def discover_live_from_processes(map, warnings)
+      out = `ps -ax -o pid=,command= 2>/dev/null`
+      return if out.nil? || out.empty?
+
+      out.each_line do |line|
+        line = line.strip
+        next if line.empty?
+        next unless line.match?(/\bgrok\b/i)
+        next if line.include?("ps -ax")
+
+        pid = line[/\A\s*(\d+)/, 1]&.to_i
+        next unless pid&.positive?
+
+        ids = line.scan(UUID_INLINE)
+        next if ids.empty?
+
+        ids.each do |id|
+          existing = map[id]
+          # Prefer a live process pid over a stale registry entry
+          if existing.nil? || !pid_alive?(existing[:pid])
+            map[id] = {
+              pid: pid,
+              cwd: existing&.dig(:cwd),
+              opened_at: existing&.dig(:opened_at),
+              source: "process"
+            }
+          end
+        end
+      end
     rescue StandardError => e
-      warnings << "active_sessions.json: #{e.message}"
-      {}
+      warnings << "process scan: #{e.message}"
     end
 
     def load_search_titles(warnings)
@@ -417,22 +458,39 @@ module GrokLens
         obj = JSON.parse(line)
         next unless obj["type"] == "user"
 
-        content = obj["content"]
-        text = flatten_content(content)
-        next if text.nil? || text.empty?
-        next if text.include?("<user_info>") && text.length > 500 && !text.match?(/<\/user_info>[\s\S]{20,}/)
-
-        # Prefer message after system wrappers
-        cleaned = text.gsub(/<user_info>[\s\S]*?<\/user_info>/, "")
-                      .gsub(/<system-reminder>[\s\S]*?<\/system-reminder>/, "")
-                      .strip
-        next if cleaned.empty?
+        text = flatten_content(obj["content"])
+        cleaned = scrub_prompt_wrappers(text)
+        next if cleaned.nil? || cleaned.empty?
 
         return clip_sentence(cleaned, 500)
       rescue JSON::ParserError
         next
       end
       nil
+    end
+
+    # Strip TUI envelope tags so skim shows only the human text.
+    def scrub_prompt_wrappers(text)
+      s = text.to_s
+      return nil if s.strip.empty?
+
+      # Prefer explicit user_query body when present
+      if s =~ %r{<user_query>\s*([\s\S]*?)\s*</user_query>}i
+        s = Regexp.last_match(1)
+      end
+
+      s = s.gsub(%r{<user_info>[\s\S]*?</user_info>}i, "")
+           .gsub(%r{<system-reminder>[\s\S]*?</system-reminder>}i, "")
+           .gsub(%r{</?user_query>}i, "")
+           .gsub(%r{</?user_info>}i, "")
+           .gsub(%r{</?system-reminder>}i, "")
+           .strip
+
+      # Skip pure-metadata synthetic turns
+      return nil if s.empty?
+      return nil if s.start_with?("<") && !s.match?(/[a-zA-Z]{3,}/)
+
+      s
     end
 
     def flatten_content(content)

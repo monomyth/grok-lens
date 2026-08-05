@@ -1,63 +1,73 @@
 (function () {
   "use strict";
 
-  function $(sel, root) {
-    return (root || document).querySelector(sel);
-  }
-
   function $all(sel, root) {
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
-  /* ---------- Theme: light / dark / system ---------- */
+  /* ---------- Theme: single cycle button light → dark → system ---------- */
   function systemDark() {
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   }
 
+  function resolveTheme(pref) {
+    if (pref === "dark") return "dark";
+    if (pref === "light") return "light";
+    return systemDark() ? "dark" : "light";
+  }
+
   function applyTheme(pref) {
     pref = pref || "system";
-    var dark = pref === "dark" || (pref === "system" && systemDark());
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme-pref", pref);
+    var resolved = resolveTheme(pref);
+    var root = document.documentElement;
+    root.setAttribute("data-theme", resolved);
+    root.setAttribute("data-theme-pref", pref);
+    root.style.colorScheme = resolved;
     try {
       localStorage.setItem("grok-lens-theme", pref);
     } catch (e) {}
-    $all(".theme-btn").forEach(function (btn) {
-      btn.classList.toggle("active", btn.getAttribute("data-theme-set") === pref);
+    var btn = document.getElementById("theme-toggle");
+    if (btn) {
+      var label = pref === "system" ? "Auto" : pref === "dark" ? "Dark" : "Light";
+      btn.textContent = label;
+      btn.setAttribute("aria-label", "Theme: " + label + " (click to cycle)");
+      btn.title = "Theme: " + label + " — click to cycle light / dark / system";
+    }
+  }
+
+  function loadThemePref() {
+    try {
+      return localStorage.getItem("grok-lens-theme") || "system";
+    } catch (e) {
+      return "system";
+    }
+  }
+
+  applyTheme(loadThemePref());
+
+  var themeBtn = document.getElementById("theme-toggle");
+  if (themeBtn) {
+    themeBtn.addEventListener("click", function () {
+      var cur = loadThemePref();
+      var next = cur === "light" ? "dark" : cur === "dark" ? "system" : "light";
+      applyTheme(next);
     });
   }
 
-  applyTheme(
-    (function () {
-      try {
-        return localStorage.getItem("grok-lens-theme") || "system";
-      } catch (e) {
-        return "system";
-      }
-    })()
-  );
-
-  $all("[data-theme-set]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      applyTheme(btn.getAttribute("data-theme-set"));
-    });
-  });
-
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-      var pref =
-        document.documentElement.getAttribute("data-theme-pref") || "system";
-      if (pref === "system") applyTheme("system");
+      if (loadThemePref() === "system") applyTheme("system");
     });
   }
 
   /* ---------- Clipboard ---------- */
   function flashCopied(btn, label) {
-    var prev = btn.textContent;
+    var prev = btn.getAttribute("data-label") || btn.textContent;
+    btn.setAttribute("data-label", prev);
     btn.textContent = label || "Copied";
     btn.classList.add("copied");
     setTimeout(function () {
-      btn.textContent = prev;
+      btn.textContent = btn.getAttribute("data-label") || prev;
       btn.classList.remove("copied");
     }, 1200);
   }
@@ -115,9 +125,9 @@
       var q = input.value.trim().toLowerCase();
       var roots = tableSelector
         ? $all(tableSelector)
-        : [input.closest("section") || document];
+        : [input.closest("main") || document];
       roots.forEach(function (root) {
-        $all("tbody tr[data-filter], tr[data-filter]", root).forEach(function (row) {
+        $all("tr[data-filter]", root).forEach(function (row) {
           var hay = (row.getAttribute("data-filter") || "").toLowerCase();
           row.style.display = !q || hay.indexOf(q) !== -1 ? "" : "none";
         });
@@ -166,39 +176,28 @@
       return;
     }
     setPollStatus(
-      "Token figures are estimates. Auto-refresh every " +
-        (secs >= 60 ? secs / 60 + "m" : secs + "s") +
-        "."
+      "Estimates only · auto-refresh " +
+        (secs >= 60 ? secs / 60 + "m" : secs + "s")
     );
-    pollTimer = setInterval(function () {
-      softRefresh();
-    }, secs * 1000);
+    pollTimer = setInterval(softRefresh, secs * 1000);
   }
 
   function softRefresh() {
-    // Only auto-refresh home page content via API; other pages just update meta if needed
     var page = body.getAttribute("data-page") || "/";
-    var url = "/api/snapshot?refresh=1";
     var t0 = performance.now();
-    fetch(url, { headers: { Accept: "application/json" } })
-      .then(function (r) {
-        return r.json();
-      })
+    fetch("/api/snapshot?refresh=1", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok) return;
         var ms = Math.round(performance.now() - t0);
         var meta = document.getElementById("snapshot-meta");
         if (meta && data.scanned_at) {
           var d = new Date(data.scanned_at);
-          var stamp =
-            d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+          var stamp = d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
           meta.textContent =
-            "snapshot · " +
-            stamp +
+            "snapshot · " + stamp +
             (data.scan_ms != null ? " · " + data.scan_ms + "ms" : "") +
-            " · net " +
-            ms +
-            "ms";
+            " · net " + ms + "ms";
         }
         var ss = document.getElementById("stat-sessions");
         var sp = document.getElementById("stat-projects");
@@ -207,49 +206,30 @@
         if (sp) sp.textContent = data.projects;
         if (st) st.textContent = data.total_est_tokens_label;
         setPollStatus(
-          "Last poll " +
-            new Date().toLocaleTimeString() +
-            " · scan " +
-            (data.scan_ms != null ? data.scan_ms + "ms" : "?") +
-            " · round-trip " +
-            ms +
-            "ms. Estimates only."
+          "Last poll " + new Date().toLocaleTimeString() +
+            " · scan " + (data.scan_ms != null ? data.scan_ms + "ms" : "?") +
+            " · " + data.active + " live"
         );
-        // Full home re-render is complex; reload when counts change on home
-        if (page === "/" && body.getAttribute("data-home-sig")) {
+        if (page === "/") {
           var sig =
-            data.primary_sessions +
-            ":" +
-            data.active +
-            ":" +
-            data.stale +
-            ":" +
-            data.total_est_tokens;
-          if (sig !== body.getAttribute("data-home-sig")) {
+            data.primary_sessions + ":" + data.active + ":" +
+            data.stale + ":" + data.total_est_tokens;
+          var prev = body.getAttribute("data-home-sig");
+          if (prev && prev !== sig && prev.indexOf(":init") === -1) {
             body.setAttribute("data-home-sig", sig);
             window.location.reload();
+            return;
           }
-        } else if (page === "/") {
-          body.setAttribute(
-            "data-home-sig",
-            data.primary_sessions +
-              ":" +
-              data.active +
-              ":" +
-              data.stale +
-              ":" +
-              data.total_est_tokens
-          );
+          body.setAttribute("data-home-sig", sig);
         }
       })
       .catch(function () {
-        setPollStatus("Poll failed — will retry on next interval.");
+        setPollStatus("Poll failed — will retry.");
       });
   }
 
   if (pollSelect) {
     var initial = loadPollSeconds();
-    // ensure option exists
     if (![].some.call(pollSelect.options, function (o) { return o.value === String(initial); })) {
       var opt = document.createElement("option");
       opt.value = String(initial);
@@ -267,16 +247,8 @@
 
   startPolling();
 
-  // On home, record baseline signature without a full reload; do not force an
-  // immediate rescan (manual Refresh / poll interval handle updates).
   if ((body.getAttribute("data-page") || "/") === "/") {
-    var ss = document.getElementById("stat-sessions");
-    var sa = document.querySelector(".stats-strip .stat .value");
-    if (ss) {
-      body.setAttribute(
-        "data-home-sig",
-        ss.textContent.trim() + ":init"
-      );
-    }
+    var ss0 = document.getElementById("stat-sessions");
+    if (ss0) body.setAttribute("data-home-sig", ss0.textContent.trim() + ":init");
   }
 })();

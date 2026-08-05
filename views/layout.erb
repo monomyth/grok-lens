@@ -7,14 +7,16 @@
   <script>
     (function () {
       try {
-        var t = localStorage.getItem("grok-lens-theme") || "system";
-        var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-        document.documentElement.setAttribute("data-theme-pref", t);
+        var pref = localStorage.getItem("grok-lens-theme") || "system";
+        var dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var resolved = dark ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", resolved);
+        document.documentElement.setAttribute("data-theme-pref", pref);
+        document.documentElement.style.colorScheme = resolved;
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=<%= GrokLens::VERSION %>">
 </head>
 <body
   data-poll-default="<%= poll_seconds_default %>"
@@ -41,19 +43,14 @@
           <span class="sep">·</span>
           <span class="num" id="stat-tokens"><%= est(@snap.total_est_tokens) %></span> est. tokens
         <% end %>
-        <label class="poll-control" title="Auto-refresh interval (client-side). Scans are typically 20–40ms.">
-          <span class="muted">Poll</span>
+        <label class="poll-control" title="Auto-refresh interval">
           <select id="poll-interval" aria-label="Polling interval">
             <% poll_presets.each do |secs, label| %>
               <option value="<%= secs %>" <%= secs == poll_seconds_default ? "selected" : "" %>><%= label %></option>
             <% end %>
           </select>
         </label>
-        <div class="theme-switch" role="group" aria-label="Color theme">
-          <button type="button" class="btn small theme-btn" data-theme-set="light" title="Light">Light</button>
-          <button type="button" class="btn small theme-btn" data-theme-set="system" title="System">Auto</button>
-          <button type="button" class="btn small theme-btn" data-theme-set="dark" title="Dark">Dark</button>
-        </div>
+        <button type="button" class="btn small" id="theme-toggle" title="Cycle light / dark / system">Theme</button>
         <form class="inline" action="/refresh" method="post">
           <button type="submit" class="btn" id="refresh-btn">Refresh</button>
         </form>
@@ -72,6 +69,6 @@
       <span class="muted" id="poll-status">Token figures are estimates (not API usage).</span>
     </footer>
   </div>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=<%= GrokLens::VERSION %>"></script>
 </body>
 </html>

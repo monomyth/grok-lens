@@ -29,7 +29,7 @@ class AppTest < Minitest::Test
   def test_session_detail
     get "/sessions/#{@ids[:parent_id]}"
     assert last_response.ok?
-    assert_match(/First user prompt/, last_response.body)
+    assert_match(/Opening message/, last_response.body)
     assert_match(/read_file/, last_response.body)
   end
 
@@ -63,7 +63,17 @@ class AppTest < Minitest::Test
     assert_match(/grok --cwd/, last_response.body)
     assert_match(/--resume/, last_response.body)
     assert_match(/Copy resume/, last_response.body)
+    refute_match(/Continue latest/i, last_response.body)
+    refute_match(/user_query/i, last_response.body)
   end
+
+  def test_theme_control_is_single_toggle
+    get "/"
+    assert last_response.ok?
+    assert_match(/id="theme-toggle"/, last_response.body)
+    refute_match(/data-theme-set="light"/, last_response.body)
+  end
+
 
   def test_api_snapshot
     get "/api/snapshot?refresh=1"

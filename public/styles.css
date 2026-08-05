@@ -1,6 +1,8 @@
-/* Grok Lens — Tufte-inspired dense ledger */
+/* Grok Lens — Tufte-inspired dense ledger
+   Theme is applied ONLY via html[data-theme=light|dark] (resolved; never leave :root fighting dark). */
 
-:root, [data-theme="light"] {
+html[data-theme="light"] {
+  color-scheme: light;
   --paper: #f7f4ef;
   --ink: #1a1a1a;
   --muted: #5c5c5c;
@@ -11,12 +13,10 @@
   --stale: #8a6d3b;
   --idle: #999;
   --prompt-bg: rgba(0, 0, 0, 0.03);
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
-  --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
-[data-theme="dark"] {
+html[data-theme="dark"] {
+  color-scheme: dark;
   --paper: #141414;
   --ink: #e8e4dc;
   --muted: #9a948a;
@@ -29,8 +29,23 @@
   --prompt-bg: rgba(255, 255, 255, 0.04);
 }
 
+/* Fallback before JS if attribute missing */
+html:not([data-theme]) {
+  color-scheme: light dark;
+  --paper: #f7f4ef;
+  --ink: #1a1a1a;
+  --muted: #5c5c5c;
+  --rule: #c8c2b8;
+  --rule-soft: #e0dbd2;
+  --accent: #1a1a1a;
+  --live: #1a1a1a;
+  --stale: #8a6d3b;
+  --idle: #999;
+  --prompt-bg: rgba(0, 0, 0, 0.03);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+  html:not([data-theme]) {
     --paper: #141414;
     --ink: #e8e4dc;
     --muted: #9a948a;
@@ -42,6 +57,12 @@
     --idle: #666;
     --prompt-bg: rgba(255, 255, 255, 0.04);
   }
+}
+
+:root {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -115,20 +136,8 @@ a:hover { text-decoration-thickness: 1.2px; }
   border-bottom-color: var(--ink);
 }
 
-.theme-switch {
-  display: inline-flex;
-  gap: 0;
-}
-.theme-btn {
-  border-radius: 0;
-  margin: 0;
-}
-.theme-btn + .theme-btn {
-  border-left: none;
-}
-.theme-btn.active {
-  background: var(--ink);
-  color: var(--paper);
+#theme-toggle {
+  min-width: 4.2rem;
 }
 
 .poll-control {
@@ -148,20 +157,15 @@ a:hover { text-decoration-thickness: 1.2px; }
 }
 
 .copy-panel {
-  margin: 1rem 0 0.5rem;
+  margin: 0.85rem 0 0.35rem;
   border-top: 0.5px solid var(--rule-soft);
-  padding-top: 0.75rem;
+  padding-top: 0.65rem;
 }
-.copy-row {
-  display: grid;
-  grid-template-columns: 8.5rem 1fr auto;
-  gap: 0.5rem;
-  align-items: start;
-  margin-bottom: 0.45rem;
-  font-size: 0.85rem;
-}
-.copy-row .label {
-  padding-top: 0.2rem;
+.copy-panel.compact .copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
 }
 .copy-value {
   font-family: var(--font-mono);
@@ -170,6 +174,12 @@ a:hover { text-decoration-thickness: 1.2px; }
   background: var(--prompt-bg);
   padding: 0.25rem 0.4rem;
   border: 0.5px solid var(--rule-soft);
+  flex: 1 1 12rem;
+}
+.resume-preview {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  word-break: break-all;
 }
 .row.actions {
   margin-top: 0.25rem;

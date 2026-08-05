@@ -37,29 +37,19 @@
     <% if @session.git_commit %><div><span class="label">Commit</span><span class="mono"><%= h(@session.git_commit[0, 10]) %></span></div><% end %>
   </div>
 
-  <div class="copy-panel">
+  <div class="copy-panel compact">
     <div class="copy-row">
-      <span class="label">Session id</span>
       <code class="copy-value" id="session-id"><%= h(@session.id) %></code>
       <button type="button" class="btn small" data-copy-text="<%= h(@session.id) %>">Copy id</button>
+      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>" title="<%= h(resume_command(@session)) %>">Copy resume</button>
     </div>
-    <div class="copy-row">
-      <span class="label">Resume (CLI)</span>
-      <code class="copy-value" id="resume-cmd"><%= h(resume_command(@session)) %></code>
-      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>">Copy resume</button>
-    </div>
-    <div class="copy-row">
-      <span class="label">Continue latest in dir</span>
-      <code class="copy-value" id="continue-cmd"><%= h(continue_command(@session)) %></code>
-      <button type="button" class="btn small" data-copy-text="<%= h(continue_command(@session)) %>">Copy</button>
-    </div>
-    <p class="muted sub">Paste into a terminal. <code>--resume</code> opens this session by UUID; <code>--continue</code> reopens the most recent session for that cwd.</p>
+    <p class="muted sub mono resume-preview"><%= h(resume_command(@session)) %></p>
   </div>
 </header>
 
 <% if @session.first_user_prompt && !@session.first_user_prompt.empty? %>
 <section class="block">
-  <h2 class="section-title">First user prompt</h2>
+  <h2 class="section-title">Opening message</h2>
   <blockquote class="prompt"><%= h(@session.first_user_prompt) %></blockquote>
 </section>
 <% end %>

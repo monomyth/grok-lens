@@ -43,7 +43,30 @@ class StoreTest < Minitest::Test
     assert parent.detail_loaded
     assert parent.tool_counts["read_file"].positive?
     assert_match(/refactor/i, parent.first_user_prompt.to_s)
+    refute_match(/user_query/i, parent.first_user_prompt.to_s)
     assert parent.activity_points.any?
+  end
+
+  def test_scrub_prompt_wrappers
+    raw = "<user_query>\nfix the theme toggle\n</user_query>"
+    cleaned = @store.send(:scrub_prompt_wrappers, raw)
+    assert_equal "fix the theme toggle", cleaned
+
+    nested = "<user_info>meta</user_info>\n<user_query>hello world</user_query>"
+    assert_equal "hello world", @store.send(:scrub_prompt_wrappers, nested)
+  end
+
+  def test_process_discovery_marks_live_resume
+    store = GrokLens::Store.new(grok_home: @home)
+    live_pid = Process.pid
+    sid = @ids[:idle_id]
+    store.define_singleton_method(:`) do |_cmd|
+      "  #{live_pid} grok --resume #{sid}\n"
+    end
+    snap = store.scan
+    sess = snap.session(sid)
+    assert_equal :active, sess.status
+    assert_equal live_pid, sess.pid
   end
 
   def test_estimate_format
