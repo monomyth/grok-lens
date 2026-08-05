@@ -41,9 +41,11 @@
     <div class="copy-row">
       <code class="copy-value" id="session-id"><%= h(@session.id) %></code>
       <button type="button" class="btn small" data-copy-text="<%= h(@session.id) %>">Copy id</button>
-      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>" title="<%= h(resume_command(@session)) %>">Copy resume</button>
     </div>
-    <p class="muted sub mono resume-preview"><%= h(resume_command(@session)) %></p>
+    <div class="copy-row">
+      <code class="copy-value mono" id="resume-cmd"><%= h(resume_command(@session)) %></code>
+      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>">Copy resume</button>
+    </div>
   </div>
 </header>
 

@@ -176,10 +176,8 @@ a:hover { text-decoration-thickness: 1.2px; }
   border: 0.5px solid var(--rule-soft);
   flex: 1 1 12rem;
 }
-.resume-preview {
-  margin: 0.35rem 0 0;
-  font-size: 0.72rem;
-  word-break: break-all;
+.copy-panel.compact .copy-row + .copy-row {
+  margin-top: 0.35rem;
 }
 .row.actions {
   margin-top: 0.25rem;
