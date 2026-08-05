@@ -88,6 +88,31 @@ class StoreTest < Minitest::Test
     assert_equal "~12k", GrokLens::Estimate.format_tokens(12_000)
   end
 
+  def test_hybrid_token_estimate_uses_signals
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    File.write(File.join(dir, "signals.json"), JSON.pretty_generate(
+      "contextTokensUsed" => 50_000,
+      "contextWindowTokens" => 500_000,
+      "turnCount" => 10,
+      "toolCallCount" => 20
+    ))
+    est = GrokLens::Estimate.for_session(
+      session_dir: dir,
+      chat_history_bytes: 1000,
+      events_bytes: 1000,
+      num_messages: 40
+    )
+    assert_equal "hybrid", est[:est_source]
+    assert_equal 50_000, est[:context_tokens]
+    assert est[:est_tokens] >= 50_000
+  end
+
+  def test_cost_helper
+    assert_in_delta 0.005, GrokLens::Estimate.cost_usd(1000, 5.0), 0.0001
+    assert_equal "$0.0050", GrokLens::Estimate.format_cost(0.005)
+  end
+
+
   def test_missing_home
     store = GrokLens::Store.new(grok_home: File.join(ROOT, "tmp", "nope-missing"))
     snap = store.scan

@@ -1,0 +1,88 @@
+<% @title = "Compare · Grok Lens" %>
+
+<header class="detail-header">
+  <h1>Compare sessions</h1>
+  <p class="desc">Side-by-side metrics — no chat dump. Pick two primaries.</p>
+  <form method="get" action="/compare" class="compare-form">
+    <label>
+      <span class="label">A</span>
+      <select name="a">
+        <option value="">—</option>
+        <% @pick_list.each do |s| %>
+          <option value="<%= h(s.id) %>" <%= @session_a && @session_a.id == s.id ? "selected" : "" %>>
+            <%= h(s.title[0, 60]) %> (<%= h(File.basename(s.cwd.to_s)) %>)
+          </option>
+        <% end %>
+      </select>
+    </label>
+    <label>
+      <span class="label">B</span>
+      <select name="b">
+        <option value="">—</option>
+        <% @pick_list.each do |s| %>
+          <option value="<%= h(s.id) %>" <%= @session_b && @session_b.id == s.id ? "selected" : "" %>>
+            <%= h(s.title[0, 60]) %> (<%= h(File.basename(s.cwd.to_s)) %>)
+          </option>
+        <% end %>
+      </select>
+    </label>
+    <button type="submit" class="btn">Compare</button>
+  </form>
+</header>
+
+<% if @session_a && @session_b %>
+<section class="block">
+  <table class="ledger compare-table">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th><a href="/sessions/<%= h(@session_a.id) %>"><%= h(@session_a.title[0, 40]) %></a></th>
+        <th><a href="/sessions/<%= h(@session_b.id) %>"><%= h(@session_b.title[0, 40]) %></a></th>
+      </tr>
+    </thead>
+    <tbody>
+      <%
+        rows = [
+          ["Status", status_label(@session_a.status), status_label(@session_b.status)],
+          ["Project", File.basename(@session_a.cwd.to_s), File.basename(@session_b.cwd.to_s)],
+          ["Model", @session_a.current_model_id, @session_b.current_model_id],
+          ["Turns", @session_a.num_turns, @session_b.num_turns],
+          ["Messages", @session_a.num_messages, @session_b.num_messages],
+          ["Est. tokens", est(@session_a.est_tokens), est(@session_b.est_tokens)],
+          ["Context", ctx_label(@session_a), ctx_label(@session_b)],
+          ["Est. source", @session_a.est_source, @session_b.est_source],
+          ["Running tasks", @session_a.running_count, @session_b.running_count],
+          ["Subagents", @session_a.children.size, @session_b.children.size],
+          ["Live subagents", @session_a.live_children_count, @session_b.live_children_count],
+          ["Disk", bytes(@session_a.disk_bytes), bytes(@session_b.disk_bytes)],
+          ["Last active", relative_time(@session_a.last_active_at), relative_time(@session_b.last_active_at)],
+          ["Duration", duration_label(@session_a), duration_label(@session_b)]
+        ]
+        if cost_enabled?
+          rows.insert(7, ["Est. cost", cost_label(@session_a.est_tokens), cost_label(@session_b.est_tokens)])
+        end
+      %>
+      <% rows.each do |label, a, b| %>
+        <tr>
+          <td class="muted"><%= h(label) %></td>
+          <td class="num"><%= h(a) %></td>
+          <td class="num"><%= h(b) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<section class="split-detail">
+  <div>
+    <h2 class="section-title">Tools A</h2>
+    <%= tool_bars(@session_a.tool_counts) %>
+  </div>
+  <div>
+    <h2 class="section-title">Tools B</h2>
+    <%= tool_bars(@session_b.tool_counts) %>
+  </div>
+</section>
+<% elsif params["a"] || params["b"] %>
+  <p class="muted">Select both A and B.</p>
+<% end %>

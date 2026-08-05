@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-08-05
+
+### Added
+
+- Hybrid token estimates (`signals.json` context + turns/tools + disk size)
+- Context window display; optional est. cost (`GROK_LENS_USD_PER_M_TOKENS` / `~/.grok-lens.yml`)
+- FTS **Search** over `session_search.sqlite`
+- **Compare** two sessions (metrics + tool histograms)
+- Home sort (last active / running / tokens / title) and “running only” filter
+- Subagent badge `+N sub · K live`
+- Partial poll re-renders Active/Recent tables without full page reload
+- Tighter running-task liveness (session pid descendants + ports; badge = bg + subagents)
+
 ## [0.2.0] — 2026-07-28
 
 ### Added
@@ -34,5 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixture-based unit and Rack tests
 - Tufte-inspired dense paper UI with SVG sparklines
 
+[0.3.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.0
 [0.2.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.1.0

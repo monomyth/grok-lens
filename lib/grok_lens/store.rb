@@ -260,6 +260,13 @@ module GrokLens
       chat_bytes = file_size(File.join(session_dir, "chat_history.jsonl"))
       events_bytes = file_size(File.join(session_dir, "events.jsonl"))
       disk = dir_size(session_dir)
+      num_messages = summary["num_messages"].to_i
+      tok = Estimate.for_session(
+        session_dir: session_dir,
+        chat_history_bytes: chat_bytes,
+        events_bytes: events_bytes,
+        num_messages: num_messages
+      )
 
       active = active_map[sid]
       status =
@@ -286,11 +293,14 @@ module GrokLens
         created_at: parse_time(summary["created_at"]),
         last_active_at: parse_time(summary["last_active_at"] || summary["updated_at"]),
         opened_at: active&.dig(:opened_at),
-        num_messages: summary["num_messages"].to_i,
+        num_messages: num_messages,
         num_chat_messages: summary["num_chat_messages"].to_i,
         num_turns: summary["next_trace_turn"].to_i,
         tool_counts: {},
-        est_tokens: Estimate.tokens(chat_history_bytes: chat_bytes, events_bytes: events_bytes),
+        est_tokens: tok[:est_tokens],
+        context_tokens: tok[:context_tokens],
+        context_window: tok[:context_window],
+        est_source: tok[:est_source],
         disk_bytes: disk,
         agent_name: summary["agent_name"],
         session_kind: kind,
@@ -417,65 +427,105 @@ module GrokLens
     end
 
     def task_live?(info, ps_index, session)
+      # TUI "tasks running" ≈ background work still attached to a live process.
+      # Foreground tool chatter is only shown on detail when very recent.
       if info[:bg] || info[:tool_name].to_s == "run_terminal_command"
-        return command_appears_running?(info, ps_index)
+        return command_appears_running?(info, ps_index, session)
       end
 
-      # Foreground tools: only if session process is live and stamp is fresh
       return false unless session.active?
 
       ts = info[:last_ts]
-      return true if ts.nil?
+      return false if ts.nil?
 
-      age = Time.now.to_i - ts.to_i
-      age = age.abs # clock skew guard
+      age = (Time.now.to_i - ts.to_i).abs
       age <= FOREGROUND_STALE_SECS
     end
 
-    def command_appears_running?(info, ps_index)
+    def command_appears_running?(info, ps_index, session = nil)
       cmd = info[:command].to_s
       title = info[:title].to_s
       hay = "#{cmd}\n#{title}"
 
+      # Prefer descendants of the session's grok pid when known
+      if session&.pid && pid_alive?(session.pid)
+        kids = descendant_commands(session.pid)
+        return true if kids.any? { |line| command_matches_line?(info, line) }
+      end
+
       # Port listeners (rackup/puma etc.)
-      hay.scan(/\b(\d{4,5})\b/).flatten.uniq.each do |port|
+      ports = hay.scan(/(?:PORT=|[:-]p\s+|port\s+|:)(\d{4,5})\b/i).flatten
+      ports += hay.scan(/\b(8\d{3}|9\d{3}|3\d{3})\b/).flatten # common dev ports
+      ports.uniq.each do |port|
         next unless port.to_i.between?(1024, 65_535)
         return true if port_listening?(port)
       end
 
-      # Distinctive command needles against process table
+      needles = command_needles(info)
+      needles.any? { |n| ps_index.any? { |line| line.include?(n) } }
+    end
+
+    def command_matches_line?(info, line)
+      command_needles(info).any? { |n| line.include?(n) } ||
+        (info[:command].to_s.include?("rackup") && line.include?("puma") && line.include?("grok-lens"))
+    end
+
+    def command_needles(info)
+      cmd = info[:command].to_s
+      title = info[:title].to_s
       needles = []
       cmd.each_line do |line|
         line = line.strip
         next if line.empty? || line.start_with?("#")
-        next if line.length < 24
-        next if line.match?(/\A(export|cd|sleep|echo|PIDS=|if |for |then|fi|done|true|false)\b/)
+        next if line.length < 20
+        next if line.match?(/\A(export|cd|sleep|echo|PIDS=|if |for |then|fi|done|true|false|\[)\b/)
 
-        needles << line[0, 48]
+        needles << line[0, 40]
       end
-      if needles.empty? && title.length > 20
-        # strip [bg] prefix and trailing task id
+      if needles.empty? && title.length > 16
         t = title.sub(/\A\[bg\]\s*/i, "").sub(/\s*\(0[0-9a-f]{7}[^)]*\)\s*\z/i, "")
-        needles << t[0, 48] if t.length >= 24
+        needles << t[0, 40] if t.length >= 16
       end
+      needles.uniq
+    end
 
-      needles.any? { |n| ps_index.any? { |line| line.include?(n) } }
+    def descendant_commands(root_pid, depth = 3)
+      lines = []
+      frontier = [root_pid.to_i]
+      depth.times do
+        break if frontier.empty?
+
+        next_gen = []
+        frontier.each do |pid|
+          out = `pgrep -P #{pid} 2>/dev/null`
+          out.to_s.split.each do |cpid|
+            cpid = cpid.to_i
+            next unless cpid.positive?
+
+            next_gen << cpid
+            cmd = `ps -p #{cpid} -o command= 2>/dev/null`.to_s.strip
+            lines << cmd unless cmd.empty?
+          end
+        end
+        frontier = next_gen
+      end
+      lines
+    rescue StandardError
+      []
     end
 
     def port_listening?(port)
-      # Prefer lsof; fall back to ps needle
       out = `lsof -nP -iTCP:#{port} -sTCP:LISTEN 2>/dev/null`
       return true if out && !out.strip.empty?
 
-      ps_index = process_command_index
-      ps_index.any? { |l| l.include?(":#{port}") || l.include?(" #{port}") }
+      process_command_index.any? { |l| l.include?(":#{port}") || l.include?(" #{port}") }
     rescue StandardError
       false
     end
 
     def process_command_index
       @process_command_index ||= begin
-        out = `ps -ax -o command= 2>/dev/null`
+        out = `ps -ax -o pid=,command= 2>/dev/null`
         out.to_s.each_line.map(&:strip).reject(&:empty?)
       rescue StandardError
         []

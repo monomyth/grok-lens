@@ -94,6 +94,27 @@ class AppTest < Minitest::Test
     assert_match(/Plugins/i, last_response.body)
   end
 
+  def test_search_and_compare_routes
+    get "/search"
+    assert last_response.ok?
+    assert_match(/Search sessions/i, last_response.body)
+
+    get "/compare"
+    assert last_response.ok?
+    assert_match(/Compare sessions/i, last_response.body)
+
+    get "/compare", a: @ids[:parent_id], b: @ids[:idle_id]
+    assert last_response.ok?
+    assert_match(/Est\. tokens/i, last_response.body)
+  end
+
+  def test_home_sort_params
+    get "/", sort: "tokens", running: "1"
+    assert last_response.ok?
+    assert_match(/Running only/i, last_response.body)
+  end
+
+
   def test_extensions_survives_non_utf8_plugin_readme
     plugin = File.join(@home, "installed-plugins", "weird-plugin-cafebabe")
     FileUtils.mkdir_p(plugin)

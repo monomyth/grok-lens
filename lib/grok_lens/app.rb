@@ -10,7 +10,6 @@ module GrokLens
     set :views, File.join(settings.root, "views")
     set :public_folder, File.join(settings.root, "public")
     set :show_exceptions, development?
-    # Local dashboard only; include rack-test default host (example.org)
     set :host_authorization, {
       permitted_hosts: [
         ".localhost", "localhost", "127.0.0.1", "0.0.0.0", "example.org"
@@ -20,6 +19,7 @@ module GrokLens
     configure do
       set :store, Store.new(grok_home: GrokLens::Config.grok_home)
       set :catalog, Catalog.new(grok_home: GrokLens::Config.grok_home)
+      set :search, Search.new(grok_home: GrokLens::Config.grok_home)
       set :snapshot, nil
       set :snapshot_mutex, Mutex.new
       set :last_scan_ms, nil
@@ -36,6 +36,8 @@ module GrokLens
 
       def refresh_snapshot!
         settings.snapshot_mutex.synchronize do
+          # clear process memo between scans
+          settings.store.instance_variable_set(:@process_command_index, nil)
           settings.snapshot = timed_scan
         end
       end
@@ -56,6 +58,19 @@ module GrokLens
         Estimate.format_bytes(n)
       end
 
+      def ctx_label(s)
+        Estimate.format_context(s.context_tokens, s.context_window)
+      end
+
+      def cost_label(tokens)
+        rate = GrokLens::Config.usd_per_m_tokens
+        Estimate.format_cost(Estimate.cost_usd(tokens, rate))
+      end
+
+      def cost_enabled?
+        !GrokLens::Config.usd_per_m_tokens.nil?
+      end
+
       def poll_seconds_default
         GrokLens::Config.poll_seconds
       end
@@ -71,11 +86,50 @@ module GrokLens
       def nav_active(path)
         request.path_info == path ? "active" : nil
       end
+
+      def sort_sessions(list, key)
+        case key
+        when "running"
+          list.sort_by { |s| [-s.running_count, -(s.last_active_at&.to_i || 0)] }
+        when "tokens"
+          list.sort_by { |s| -(s.est_tokens || 0) }
+        when "title"
+          list.sort_by { |s| s.title.to_s.downcase }
+        else # last_active
+          list.sort_by { |s| -(s.last_active_at&.to_i || 0) }
+        end
+      end
     end
 
     get "/" do
       @snap = snapshot
+      @sort = params["sort"].to_s
+      @sort = "last_active" if @sort.empty?
+      @filter_running = params["running"].to_s == "1"
+      list = @snap.primary_sessions
+      list = list.select { |s| s.running_count.positive? } if @filter_running
+      @sorted_sessions = sort_sessions(list, @sort)
       erb :home
+    end
+
+    get "/search" do
+      @snap = snapshot
+      @q = params["q"].to_s
+      @search_available = settings.search.available?
+      @results = @q.empty? ? [] : settings.search.query(@q)
+      erb :search
+    end
+
+    get "/compare" do
+      @snap = snapshot
+      a_id = params["a"].to_s
+      b_id = params["b"].to_s
+      @session_a = a_id.empty? ? nil : @snap.session(a_id)
+      @session_b = b_id.empty? ? nil : @snap.session(b_id)
+      @session_a = settings.store.enrich_session(@session_a) if @session_a
+      @session_b = settings.store.enrich_session(@session_b) if @session_b
+      @pick_list = @snap.primary_sessions.first(80)
+      erb :compare
     end
 
     get "/glossary" do
@@ -118,11 +172,11 @@ module GrokLens
       redirect back
     end
 
-    # Soft live poll endpoint: re-scan and return compact JSON for the home view.
     get "/api/snapshot" do
       content_type :json
       force = params["refresh"].to_s == "1" || params["refresh"].to_s == "true"
       snap = force ? refresh_snapshot! : snapshot
+      rate = GrokLens::Config.usd_per_m_tokens
       {
         ok: true,
         scanned_at: snap.scanned_at.utc.iso8601,
@@ -133,12 +187,15 @@ module GrokLens
         projects: snap.projects.size,
         total_est_tokens: snap.total_est_tokens,
         total_est_tokens_label: Estimate.format_tokens(snap.total_est_tokens),
+        total_cost_label: Estimate.format_cost(Estimate.cost_usd(snap.total_est_tokens, rate)),
+        cost_enabled: !rate.nil?,
         active: snap.active_sessions.count(&:active?),
         stale: snap.active_sessions.count(&:stale?),
+        total_running: snap.primary_sessions.sum(&:running_count),
         warnings: snap.warnings.size,
         models_hist: snap.models_hist,
         active_sessions: snap.active_sessions.map { |s| session_json(s) },
-        recent_sessions: snap.primary_sessions.first(40).map { |s| session_json(s) },
+        recent_sessions: snap.primary_sessions.first(60).map { |s| session_json(s) },
         projects_list: snap.projects.map { |p|
           {
             id: p.id,
@@ -154,6 +211,25 @@ module GrokLens
       }.to_json
     end
 
+    get "/api/search" do
+      content_type :json
+      q = params["q"].to_s
+      {
+        ok: true,
+        available: settings.search.available?,
+        q: q,
+        results: settings.search.query(q).map { |r|
+          {
+            session_id: r.session_id,
+            cwd: r.cwd,
+            title: r.title,
+            snippet: r.snippet,
+            rank: r.rank
+          }
+        }
+      }.to_json
+    end
+
     get "/health" do
       content_type :json
       {
@@ -161,7 +237,8 @@ module GrokLens
         version: GrokLens::VERSION,
         ruby: RUBY_VERSION,
         poll_seconds_default: GrokLens::Config.poll_seconds,
-        last_scan_ms: settings.last_scan_ms
+        last_scan_ms: settings.last_scan_ms,
+        cost_enabled: !GrokLens::Config.usd_per_m_tokens.nil?
       }.to_json
     end
 
@@ -183,8 +260,13 @@ module GrokLens
           num_messages: s.num_messages,
           est_tokens: s.est_tokens,
           est_tokens_label: Estimate.format_tokens(s.est_tokens),
+          context_tokens: s.context_tokens,
+          context_label: Estimate.format_context(s.context_tokens, s.context_window),
+          est_source: s.est_source,
           last_active_at: s.last_active_at&.utc&.iso8601,
+          last_active_rel: relative_time(s.last_active_at),
           children: s.children.size,
+          live_children: s.live_children_count,
           running_count: s.running_count,
           running_tasks: Array(s.running_tasks).select(&:live).map { |t|
             { id: t.id, kind: t.kind.to_s, title: t.title, status: t.status, tool_name: t.tool_name }

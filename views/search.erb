@@ -1,0 +1,50 @@
+<% @title = "Search · Grok Lens" %>
+
+<header class="detail-header">
+  <h1>Search sessions</h1>
+  <p class="desc">
+    Full-text over Grok’s <code>session_search.sqlite</code> index (titles + content Grok already indexed).
+  </p>
+  <form class="search-form" method="get" action="/search">
+    <input type="search" name="q" value="<%= h(@q) %>" class="filter wide" placeholder="Query…" autofocus>
+    <button type="submit" class="btn">Search</button>
+  </form>
+  <% unless @search_available %>
+    <p class="warn">No index at <code>sessions/session_search.sqlite</code> under GROK_HOME.</p>
+  <% end %>
+</header>
+
+<% if !@q.empty? %>
+<section class="block">
+  <h2 class="section-title"><%= @results.size %> result<%= @results.size == 1 ? "" : "s" %></h2>
+  <% if @results.empty? %>
+    <p class="muted">No matches.</p>
+  <% else %>
+    <table class="ledger">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Project</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @results.each do |r| %>
+          <tr>
+            <td>
+              <a href="/sessions/<%= h(r.session_id) %>"><%= h(r.title.empty? ? r.session_id[0, 8] : r.title) %></a>
+              <% if r.snippet && !r.snippet.empty? %>
+                <div class="subline muted"><%= h(r.snippet) %></div>
+              <% end %>
+            </td>
+            <td class="mono"><%= h(File.basename(r.cwd.to_s)) %></td>
+            <td class="r">
+              <a class="btn small" href="/compare?a=<%= h(r.session_id) %>">Compare…</a>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
+<% end %>

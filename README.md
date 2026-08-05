@@ -53,6 +53,8 @@ Open **http://127.0.0.1:9292**
 | `HOST` | `127.0.0.1` | Bind address |
 | `PORT` | `9292` | HTTP port |
 | `GROK_LENS_POLL_SECONDS` | `300` | Default auto-refresh interval (UI can override; `0` = off) |
+| `GROK_LENS_USD_PER_M_TOKENS` | unset | Optional USD per 1M tokens for est. cost column |
+| `GROK_LENS_CONFIG` | `~/.grok-lens.yml` | Optional YAML (`usd_per_m_tokens`) |
 
 ```bash
 GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens

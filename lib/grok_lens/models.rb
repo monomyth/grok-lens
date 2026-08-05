@@ -30,6 +30,9 @@ module GrokLens
     :num_turns,
     :tool_counts,
     :est_tokens,
+    :context_tokens,
+    :context_window,
+    :est_source,
     :disk_bytes,
     :agent_name,
     :session_kind,
@@ -56,8 +59,17 @@ module GrokLens
       status == :stale
     end
 
+    # Badge count: bg shells + live subagents (closer to TUI "tasks running")
     def running_count
-      Array(running_tasks).count { |t| t.live }
+      Array(running_tasks).count { |t| t.live && %i[bg_shell subagent].include?(t.kind) }
+    end
+
+    def running_all_count
+      Array(running_tasks).count(&:live)
+    end
+
+    def live_children_count
+      Array(children).count(&:active?)
     end
 
     def with(**changes)

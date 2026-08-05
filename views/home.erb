@@ -7,32 +7,32 @@
   </section>
 <% else %>
 
-<section class="stats-strip">
+<section class="stats-strip" id="stats-strip">
   <div class="stat">
-    <div class="label">Active</div>
-    <div class="value num"><%= @snap.active_sessions.count { |s| s.active? } %></div>
-    <div class="sub"><%= @snap.active_sessions.count(&:stale?) %> stale</div>
+    <div class="label">Live sessions</div>
+    <div class="value num" id="stat-live"><%= @snap.active_sessions.count { |s| s.active? } %></div>
+    <div class="sub"><span id="stat-stale"><%= @snap.active_sessions.count(&:stale?) %></span> stale · <span id="stat-running-total"><%= @snap.primary_sessions.sum(&:running_count) %></span> tasks</div>
   </div>
   <div class="stat">
     <div class="label">Est. tokens</div>
-    <div class="value num"><%= est(@snap.total_est_tokens) %></div>
-    <div class="sub">all sessions · est.</div>
+    <div class="value num" id="stat-tokens"><%= est(@snap.total_est_tokens) %></div>
+    <div class="sub"><% if cost_enabled? %>est. cost <span id="stat-cost"><%= cost_label(@snap.total_est_tokens) %></span><% else %>lifetime proxy · hybrid<% end %></div>
   </div>
   <div class="stat">
     <div class="label">Primary sessions</div>
-    <div class="value num"><%= @snap.primary_sessions.size %></div>
+    <div class="value num" id="stat-sessions"><%= @snap.primary_sessions.size %></div>
     <div class="sub"><%= @snap.sessions_by_id.size %> incl. nested</div>
   </div>
   <div class="stat">
     <div class="label">Models</div>
-    <div class="model-list"><%= model_bars(@snap.models_hist) %></div>
+    <div class="model-list" id="stat-models"><%= model_bars(@snap.models_hist) %></div>
   </div>
 </section>
 
 <% if @snap.active_sessions.any? %>
-<section class="block">
+<section class="block" id="active-block">
   <h2 class="section-title">Active now</h2>
-  <table class="ledger">
+  <table class="ledger" id="active-table">
     <thead>
       <tr>
         <th>Status</th>
@@ -44,21 +44,24 @@
         <th class="r">Est. tok</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="active-tbody">
       <% @snap.active_sessions.each do |s| %>
-        <tr>
+        <tr data-id="<%= h(s.id) %>">
           <td><span class="dot <%= s.status %>"></span><%= status_label(s.status) %><% if s.pid %> <span class="muted">pid <%= s.pid %></span><% end %></td>
           <td class="mono"><%= h(File.basename(s.cwd.to_s)) %></td>
-          <td><a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
-            <% if s.children.any? %><span class="badge">+<%= s.children.size %> sub</span><% end %>
+          <td>
+            <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
+            <% if s.children.any? %>
+              <span class="badge">+<%= s.children.size %> sub<% if s.live_children_count.positive? %> · <%= s.live_children_count %> live<% end %></span>
+            <% end %>
             <% if s.running_count.positive? %><span class="badge live-tasks"><%= s.running_count %> running</span><% end %>
             <div class="row actions">
-              <button type="button" class="btn small" data-copy-text="<%= h(s.id) %>" title="Copy session id">Id</button>
-              <button type="button" class="btn small" data-copy-text="<%= h(resume_command(s)) %>" title="Copy grok --resume command">Resume</button>
+              <button type="button" class="btn small" data-copy-text="<%= h(s.id) %>">Id</button>
+              <button type="button" class="btn small" data-copy-text="<%= h(resume_command(s)) %>">Resume</button>
             </div>
           </td>
           <td><%= h(s.current_model_id || s.models.first) %></td>
-          <td class="r num"><%= s.running_count.positive? ? s.running_count : "—" %></td>
+          <td class="r num running-cell"><%= s.running_count.positive? ? s.running_count : "—" %></td>
           <td class="r num"><%= s.num_turns %></td>
           <td class="r num"><%= est(s.est_tokens) %></td>
         </tr>
@@ -71,6 +74,7 @@
 <section class="dual">
   <div class="col">
     <h2 class="section-title">Projects</h2>
+    <div id="projects-list">
     <% if @snap.projects.empty? %>
       <p class="muted">No projects found.</p>
     <% end %>
@@ -85,28 +89,55 @@
         <div class="model-list compact"><%= model_bars(p.models_hist) %></div>
       </article>
     <% end %>
+    </div>
   </div>
 
   <div class="col">
-    <div class="row between">
-      <h2 class="section-title">Recent sessions</h2>
-      <input type="search" id="filter" class="filter" placeholder="Filter…" aria-label="Filter sessions">
+    <div class="row between wrap">
+      <h2 class="section-title">Sessions</h2>
+      <div class="toolbar">
+        <form method="get" action="/" class="inline toolbar-form">
+          <select name="sort" aria-label="Sort sessions" onchange="this.form.submit()">
+            <option value="last_active" <%= @sort == "last_active" ? "selected" : "" %>>Last active</option>
+            <option value="running" <%= @sort == "running" ? "selected" : "" %>>Running tasks</option>
+            <option value="tokens" <%= @sort == "tokens" ? "selected" : "" %>>Est. tokens</option>
+            <option value="title" <%= @sort == "title" ? "selected" : "" %>>Title</option>
+          </select>
+          <label class="check">
+            <input type="checkbox" name="running" value="1" <%= @filter_running ? "checked" : "" %> onchange="this.form.submit()">
+            Running only
+          </label>
+        </form>
+        <input type="search" id="filter" class="filter" placeholder="Filter…" aria-label="Filter sessions">
+      </div>
     </div>
     <table class="ledger" id="recent-sessions">
-      <tbody>
-        <% @snap.primary_sessions.first(40).each do |s| %>
-          <tr data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id}") %>">
+      <thead>
+        <tr>
+          <th>Age</th>
+          <th>Session</th>
+          <th class="r">Run</th>
+          <th class="r">Est. tok</th>
+        </tr>
+      </thead>
+      <tbody id="recent-tbody">
+        <% @sorted_sessions.first(50).each do |s| %>
+          <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>">
             <td class="age muted num"><%= relative_time(s.last_active_at) %></td>
             <td>
               <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
-              <% if s.children.any? %><span class="badge">+<%= s.children.size %> sub</span><% end %>
+              <% if s.children.any? %>
+                <span class="badge">+<%= s.children.size %> sub<% if s.live_children_count.positive? %> · <%= s.live_children_count %> live<% end %></span>
+              <% end %>
               <% if s.running_count.positive? %><span class="badge live-tasks"><%= s.running_count %> running</span><% end %>
-              <div class="subline muted"><%= h(File.basename(s.cwd.to_s)) %> · <%= h(s.current_model_id) %> · <%= s.num_turns %> turns · <%= s.num_messages %> msgs</div>
+              <div class="subline muted"><%= h(File.basename(s.cwd.to_s)) %> · <%= h(s.current_model_id) %> · <%= s.num_turns %> turns<% if s.context_tokens %> · ctx <%= est(s.context_tokens) %><% end %></div>
               <div class="row actions">
                 <button type="button" class="btn small" data-copy-text="<%= h(s.id) %>">Id</button>
                 <button type="button" class="btn small" data-copy-text="<%= h(resume_command(s)) %>">Resume</button>
+                <a class="btn small" href="/compare?a=<%= h(s.id) %>">Compare</a>
               </div>
             </td>
+            <td class="r num running-cell"><%= s.running_count.positive? ? s.running_count : "—" %></td>
             <td class="r num"><%= est(s.est_tokens) %></td>
           </tr>
         <% end %>

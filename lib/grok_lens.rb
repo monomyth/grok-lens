@@ -9,9 +9,10 @@ require_relative "grok_lens/models"
 require_relative "grok_lens/estimate"
 require_relative "grok_lens/presenters"
 require_relative "grok_lens/catalog"
+require_relative "grok_lens/search"
 require_relative "grok_lens/store"
 require_relative "grok_lens/app"
 
 module GrokLens
-  VERSION = "0.2.2"
+  VERSION = "0.3.0"
 end

@@ -1,0 +1,3 @@
+# Copy to ~/.grok-lens.yml (or set GROK_LENS_CONFIG)
+# Optional estimated cost: USD per 1 million tokens (blended input/output).
+usd_per_m_tokens: 5.0

@@ -5,17 +5,27 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
-  /* ---------- Theme: single cycle button light → dark → system ---------- */
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /* ---------- Theme ---------- */
   function systemDark() {
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   }
-
   function resolveTheme(pref) {
     if (pref === "dark") return "dark";
     if (pref === "light") return "light";
     return systemDark() ? "dark" : "light";
   }
-
+  function loadThemePref() {
+    try { return localStorage.getItem("grok-lens-theme") || "system"; }
+    catch (e) { return "system"; }
+  }
   function applyTheme(pref) {
     pref = pref || "system";
     var resolved = resolveTheme(pref);
@@ -23,37 +33,22 @@
     root.setAttribute("data-theme", resolved);
     root.setAttribute("data-theme-pref", pref);
     root.style.colorScheme = resolved;
-    try {
-      localStorage.setItem("grok-lens-theme", pref);
-    } catch (e) {}
+    try { localStorage.setItem("grok-lens-theme", pref); } catch (e) {}
     var btn = document.getElementById("theme-toggle");
     if (btn) {
       var label = pref === "system" ? "Auto" : pref === "dark" ? "Dark" : "Light";
       btn.textContent = label;
-      btn.setAttribute("aria-label", "Theme: " + label + " (click to cycle)");
-      btn.title = "Theme: " + label + " — click to cycle light / dark / system";
+      btn.title = "Theme: " + label + " — click to cycle";
     }
   }
-
-  function loadThemePref() {
-    try {
-      return localStorage.getItem("grok-lens-theme") || "system";
-    } catch (e) {
-      return "system";
-    }
-  }
-
   applyTheme(loadThemePref());
-
   var themeBtn = document.getElementById("theme-toggle");
   if (themeBtn) {
     themeBtn.addEventListener("click", function () {
       var cur = loadThemePref();
-      var next = cur === "light" ? "dark" : cur === "dark" ? "system" : "light";
-      applyTheme(next);
+      applyTheme(cur === "light" ? "dark" : cur === "dark" ? "system" : "light");
     });
   }
-
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
       if (loadThemePref() === "system") applyTheme("system");
@@ -71,7 +66,6 @@
       btn.classList.remove("copied");
     }, 1200);
   }
-
   function legacyCopy(text) {
     var ta = document.createElement("textarea");
     ta.value = text;
@@ -81,66 +75,44 @@
     document.body.appendChild(ta);
     ta.select();
     var ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch (e) {
-      ok = false;
-    }
+    try { ok = document.execCommand("copy"); } catch (e) {}
     document.body.removeChild(ta);
     return ok;
   }
-
   function copyText(text, btn) {
     if (!text) return;
-    function done(ok) {
-      if (btn) flashCopied(btn, ok ? "Copied" : "Failed");
-    }
+    function done(ok) { if (btn) flashCopied(btn, ok ? "Copied" : "Failed"); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        function () { done(true); },
-        function () { done(legacyCopy(text)); }
-      );
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(legacyCopy(text)); });
     } else {
       done(legacyCopy(text));
     }
   }
-
   document.addEventListener("click", function (ev) {
-    var btn = ev.target.closest("[data-copy-text], [data-copy]");
+    var btn = ev.target.closest("[data-copy-text]");
     if (!btn) return;
-    if (btn.hasAttribute("data-copy-text")) {
-      copyText(btn.getAttribute("data-copy-text"), btn);
-      return;
-    }
-    var sel = btn.getAttribute("data-copy");
-    var el = sel ? document.querySelector(sel) : null;
-    if (el) copyText(el.textContent.trim(), btn);
+    copyText(btn.getAttribute("data-copy-text"), btn);
   });
 
-  /* ---------- Table filters ---------- */
-  function bindFilter(inputId, tableSelector) {
+  /* ---------- Filters ---------- */
+  function bindFilter(inputId) {
     var input = document.getElementById(inputId);
     if (!input) return;
     input.addEventListener("input", function () {
       var q = input.value.trim().toLowerCase();
-      var roots = tableSelector
-        ? $all(tableSelector)
-        : [input.closest("main") || document];
-      roots.forEach(function (root) {
-        $all("tr[data-filter]", root).forEach(function (row) {
-          var hay = (row.getAttribute("data-filter") || "").toLowerCase();
-          row.style.display = !q || hay.indexOf(q) !== -1 ? "" : "none";
-        });
+      $all("tr[data-filter]").forEach(function (row) {
+        var hay = (row.getAttribute("data-filter") || "").toLowerCase();
+        row.style.display = !q || hay.indexOf(q) !== -1 ? "" : "none";
       });
     });
   }
+  bindFilter("filter");
+  bindFilter("glossary-filter");
+  bindFilter("ext-filter");
 
-  bindFilter("filter", "#recent-sessions");
-  bindFilter("glossary-filter", ".glossary-table");
-  bindFilter("ext-filter", null);
-
-  /* ---------- Live polling ---------- */
+  /* ---------- Partial poll (home) ---------- */
   var body = document.body;
+  var page = body.getAttribute("data-page") || "/";
   var defaultPoll = parseInt(body.getAttribute("data-poll-default") || "300", 10);
   var pollSelect = document.getElementById("poll-interval");
   var pollTimer = null;
@@ -153,79 +125,144 @@
     } catch (e) {}
     return defaultPoll;
   }
-
   function savePollSeconds(n) {
-    try {
-      localStorage.setItem("grok-lens-poll-seconds", String(n));
-    } catch (e) {}
+    try { localStorage.setItem("grok-lens-poll-seconds", String(n)); } catch (e) {}
   }
-
   function setPollStatus(msg) {
     if (pollStatus) pollStatus.textContent = msg;
   }
 
-  function startPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-    var secs = loadPollSeconds();
-    if (pollSelect) pollSelect.value = String(secs);
-    if (!secs || secs <= 0) {
-      setPollStatus("Token figures are estimates (not API usage). Polling off.");
-      return;
-    }
-    setPollStatus(
-      "Estimates only · auto-refresh " +
-        (secs >= 60 ? secs / 60 + "m" : secs + "s")
+  function renderActiveRow(s) {
+    var sub = s.children > 0
+      ? '<span class="badge">+' + s.children + ' sub' +
+        (s.live_children > 0 ? ' · ' + s.live_children + ' live' : '') + '</span>'
+      : '';
+    var runBadge = s.running_count > 0
+      ? '<span class="badge live-tasks">' + s.running_count + ' running</span>'
+      : '';
+    return (
+      '<tr data-id="' + esc(s.id) + '">' +
+      '<td><span class="dot ' + esc(s.status) + '"></span>' + esc(s.status === "active" ? "live" : s.status) +
+      (s.pid ? ' <span class="muted">pid ' + esc(s.pid) + '</span>' : '') + '</td>' +
+      '<td class="mono">' + esc(s.project) + '</td>' +
+      '<td><a href="/sessions/' + esc(s.id) + '">' + esc(s.title) + '</a> ' + sub + runBadge +
+      '<div class="row actions">' +
+      '<button type="button" class="btn small" data-copy-text="' + esc(s.id) + '">Id</button> ' +
+      '<button type="button" class="btn small" data-copy-text="' + esc(s.resume_command) + '">Resume</button>' +
+      '</div></td>' +
+      '<td>' + esc(s.model) + '</td>' +
+      '<td class="r num running-cell">' + (s.running_count > 0 ? s.running_count : '—') + '</td>' +
+      '<td class="r num">' + esc(s.num_turns) + '</td>' +
+      '<td class="r num">' + esc(s.est_tokens_label) + '</td></tr>'
     );
-    pollTimer = setInterval(softRefresh, secs * 1000);
+  }
+
+  function renderRecentRow(s) {
+    var sub = s.children > 0
+      ? '<span class="badge">+' + s.children + ' sub' +
+        (s.live_children > 0 ? ' · ' + s.live_children + ' live' : '') + '</span>'
+      : '';
+    var runBadge = s.running_count > 0
+      ? '<span class="badge live-tasks">' + s.running_count + ' running</span>'
+      : '';
+    var ctx = s.context_tokens ? ' · ctx ' + esc(s.est_tokens_label && s.context_label ? s.context_label.split(' ')[0] : '') : '';
+    var filter = [s.title, s.cwd, s.model, s.id].join(' ');
+    return (
+      '<tr data-id="' + esc(s.id) + '" data-filter="' + esc(filter) + '" data-running="' + esc(s.running_count) + '">' +
+      '<td class="age muted num">' + esc(s.last_active_rel || '—') + '</td>' +
+      '<td><a href="/sessions/' + esc(s.id) + '">' + esc(s.title) + '</a> ' + sub + runBadge +
+      '<div class="subline muted">' + esc(s.project) + ' · ' + esc(s.model) + ' · ' + esc(s.num_turns) + ' turns' + ctx + '</div>' +
+      '<div class="row actions">' +
+      '<button type="button" class="btn small" data-copy-text="' + esc(s.id) + '">Id</button> ' +
+      '<button type="button" class="btn small" data-copy-text="' + esc(s.resume_command) + '">Resume</button> ' +
+      '<a class="btn small" href="/compare?a=' + esc(s.id) + '">Compare</a>' +
+      '</div></td>' +
+      '<td class="r num running-cell">' + (s.running_count > 0 ? s.running_count : '—') + '</td>' +
+      '<td class="r num">' + esc(s.est_tokens_label) + '</td></tr>'
+    );
+  }
+
+  function applySnapshot(data) {
+    var meta = document.getElementById("snapshot-meta");
+    if (meta && data.scanned_at) {
+      var d = new Date(data.scanned_at);
+      var stamp = d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+      meta.textContent =
+        "snapshot · " + stamp +
+        (data.scan_ms != null ? " · " + data.scan_ms + "ms" : "");
+    }
+    var el;
+    if ((el = document.getElementById("stat-live"))) el.textContent = data.active;
+    if ((el = document.getElementById("stat-stale"))) el.textContent = data.stale;
+    if ((el = document.getElementById("stat-running-total"))) el.textContent = data.total_running != null ? data.total_running : "—";
+    if ((el = document.getElementById("stat-sessions"))) el.textContent = data.primary_sessions;
+    if ((el = document.getElementById("stat-tokens"))) el.textContent = data.total_est_tokens_label;
+    if ((el = document.getElementById("stat-cost")) && data.total_cost_label) el.textContent = data.total_cost_label;
+
+    var activeBody = document.getElementById("active-tbody");
+    if (activeBody && data.active_sessions) {
+      activeBody.innerHTML = data.active_sessions.map(renderActiveRow).join("");
+    }
+    var recentBody = document.getElementById("recent-tbody");
+    if (recentBody && data.recent_sessions) {
+      // Preserve client sort/filter controls: only update if no custom sort query
+      var params = new URLSearchParams(window.location.search);
+      if (!params.get("sort") || params.get("sort") === "last_active") {
+        if (!params.get("running")) {
+          recentBody.innerHTML = data.recent_sessions.slice(0, 50).map(renderRecentRow).join("");
+        }
+      } else {
+        // Update running cells in place for existing rows
+        data.recent_sessions.forEach(function (s) {
+          var row = recentBody.querySelector('tr[data-id="' + s.id + '"]');
+          if (!row) return;
+          var cell = row.querySelector(".running-cell");
+          if (cell) cell.textContent = s.running_count > 0 ? s.running_count : "—";
+          row.setAttribute("data-running", s.running_count);
+        });
+      }
+    }
   }
 
   function softRefresh() {
-    var page = body.getAttribute("data-page") || "/";
     var t0 = performance.now();
     fetch("/api/snapshot?refresh=1", { headers: { Accept: "application/json" } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok) return;
         var ms = Math.round(performance.now() - t0);
-        var meta = document.getElementById("snapshot-meta");
-        if (meta && data.scanned_at) {
-          var d = new Date(data.scanned_at);
-          var stamp = d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
-          meta.textContent =
-            "snapshot · " + stamp +
-            (data.scan_ms != null ? " · " + data.scan_ms + "ms" : "") +
-            " · net " + ms + "ms";
+        if (page === "/" || page === "") applySnapshot(data);
+        else {
+          var meta = document.getElementById("snapshot-meta");
+          if (meta && data.scanned_at) {
+            var d = new Date(data.scanned_at);
+            meta.textContent =
+              "snapshot · " + d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC") +
+              (data.scan_ms != null ? " · " + data.scan_ms + "ms" : "");
+          }
         }
-        var ss = document.getElementById("stat-sessions");
-        var sp = document.getElementById("stat-projects");
-        var st = document.getElementById("stat-tokens");
-        if (ss) ss.textContent = data.primary_sessions;
-        if (sp) sp.textContent = data.projects;
-        if (st) st.textContent = data.total_est_tokens_label;
         setPollStatus(
           "Last poll " + new Date().toLocaleTimeString() +
             " · scan " + (data.scan_ms != null ? data.scan_ms + "ms" : "?") +
-            " · " + data.active + " live"
+            " · net " + ms + "ms · " + data.active + " live · " +
+            (data.total_running != null ? data.total_running + " tasks" : "")
         );
-        if (page === "/") {
-          var sig =
-            data.primary_sessions + ":" + data.active + ":" +
-            data.stale + ":" + data.total_est_tokens;
-          var prev = body.getAttribute("data-home-sig");
-          if (prev && prev !== sig && prev.indexOf(":init") === -1) {
-            body.setAttribute("data-home-sig", sig);
-            window.location.reload();
-            return;
-          }
-          body.setAttribute("data-home-sig", sig);
-        }
       })
       .catch(function () {
         setPollStatus("Poll failed — will retry.");
       });
+  }
+
+  function startPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    var secs = loadPollSeconds();
+    if (pollSelect) pollSelect.value = String(secs);
+    if (!secs || secs <= 0) {
+      setPollStatus("Token figures are estimates. Polling off.");
+      return;
+    }
+    setPollStatus("Estimates only · auto-refresh " + (secs >= 60 ? secs / 60 + "m" : secs + "s"));
+    pollTimer = setInterval(softRefresh, secs * 1000);
   }
 
   if (pollSelect) {
@@ -244,11 +281,5 @@
       if (n > 0) softRefresh();
     });
   }
-
   startPolling();
-
-  if ((body.getAttribute("data-page") || "/") === "/") {
-    var ss0 = document.getElementById("stat-sessions");
-    if (ss0) body.setAttribute("data-home-sig", ss0.textContent.trim() + ":init");
-  }
 })();

@@ -31,6 +31,23 @@ module GrokLens
       "grok --cwd #{Shellwords.escape(cwd)} --continue"
     end
 
+    def duration_label(session)
+      a = session.created_at
+      b = session.last_active_at
+      return "—" unless a && b
+
+      secs = (b - a).to_i
+      return "—" if secs < 0
+
+      if secs < 3600
+        "#{secs / 60}m"
+      elsif secs < 86_400
+        "#{secs / 3600}h"
+      else
+        "#{secs / 86_400}d"
+      end
+    end
+
     def short_path(path, home: Dir.home)
       return "" if path.nil? || path.empty?
 

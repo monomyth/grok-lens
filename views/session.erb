@@ -25,8 +25,14 @@
   <div class="meta-grid">
     <div><span class="label">Model</span><span><%= h(@session.current_model_id) %></span></div>
     <div><span class="label">Models used</span><span><%= h(@session.models.join(", ")) %></span></div>
-    <div><span class="label">Est. tokens</span><span class="num"><%= est(@session.est_tokens) %></span></div>
+    <div><span class="label">Est. tokens</span><span class="num"><%= est(@session.est_tokens) %></span><div class="subline muted"><%= h(@session.est_source || "size") %></div></div>
+    <div><span class="label">Context</span><span class="num"><%= ctx_label(@session) %></span></div>
+    <% if cost_enabled? %>
+    <div><span class="label">Est. cost</span><span class="num"><%= cost_label(@session.est_tokens) %></span></div>
+    <% end %>
     <div><span class="label">Disk</span><span class="num"><%= bytes(@session.disk_bytes) %></span></div>
+    <div><span class="label">Running</span><span class="num"><%= @session.running_count %></span></div>
+    <div><span class="label">Subagents</span><span class="num"><%= @session.children.size %><% if @session.live_children_count.positive? %> (<%= @session.live_children_count %> live)<% end %></span></div>
     <div><span class="label">Turns</span><span class="num"><%= @session.num_turns %></span></div>
     <div><span class="label">Messages</span><span class="num"><%= @session.num_messages %></span></div>
     <div><span class="label">Chat msgs</span><span class="num"><%= @session.num_chat_messages %></span></div>
