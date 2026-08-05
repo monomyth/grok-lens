@@ -59,12 +59,8 @@ module GrokLens
       status == :stale
     end
 
-    # Badge count: bg shells + live subagents (closer to TUI "tasks running")
+    # All live in-flight work units (bg shells, tools, subagents) that passed liveness checks.
     def running_count
-      Array(running_tasks).count { |t| t.live && %i[bg_shell subagent].include?(t.kind) }
-    end
-
-    def running_all_count
       Array(running_tasks).count(&:live)
     end
 
