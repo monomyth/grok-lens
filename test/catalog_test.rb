@@ -78,6 +78,18 @@ class CatalogTest < Minitest::Test
     assert_match(/example/i, plugins.first.description)
   end
 
+  def test_utf8_normalization_for_binary_files
+    plugin_dir = File.join(@home, "installed-plugins", "binary-plugin-deadbeef")
+    FileUtils.mkdir_p(plugin_dir)
+    # Non-UTF-8 bytes that would crash ERB if left as ASCII-8BIT
+    File.binwrite(File.join(plugin_dir, "README.md"), "# Bin\n\nCaf\xE9 style plugin with \x80 binary.\n".b)
+    cat = GrokLens::Catalog.new(grok_home: @home)
+    plug = cat.plugins.find { |p| p.id == "binary-plugin-deadbeef" }
+    assert plug
+    assert_equal Encoding::UTF_8, plug.description.encoding
+    assert plug.description.valid_encoding?
+  end
+
   def test_resume_command
     session = GrokLens::Session.new(
       id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",

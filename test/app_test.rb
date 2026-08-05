@@ -75,7 +75,6 @@ class AppTest < Minitest::Test
   end
 
   def test_glossary_and_extensions_routes
-    # catalog against real or empty home is fine; routes must 200
     get "/glossary"
     assert last_response.ok?
     assert_match(/glossary/i, last_response.body)
@@ -84,5 +83,16 @@ class AppTest < Minitest::Test
     assert last_response.ok?
     assert_match(/Plugins/i, last_response.body)
   end
+
+  def test_extensions_survives_non_utf8_plugin_readme
+    plugin = File.join(@home, "installed-plugins", "weird-plugin-cafebabe")
+    FileUtils.mkdir_p(plugin)
+    File.binwrite(File.join(plugin, "README.md"), "# Weird\n\nCaf\xE9 and \x80 bytes in readme.\n".b)
+    GrokLens::App.set :catalog, GrokLens::Catalog.new(grok_home: @home)
+    get "/extensions"
+    assert last_response.ok?, last_response.body[0, 400]
+    assert_match(/weird-plugin/i, last_response.body)
+  end
 end
+
 

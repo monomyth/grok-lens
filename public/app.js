@@ -62,22 +62,36 @@
     }, 1200);
   }
 
+  function legacyCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      ok = false;
+    }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
   function copyText(text, btn) {
     if (!text) return;
+    function done(ok) {
+      if (btn) flashCopied(btn, ok ? "Copied" : "Failed");
+    }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () {
-        if (btn) flashCopied(btn);
-      });
+      navigator.clipboard.writeText(text).then(
+        function () { done(true); },
+        function () { done(legacyCopy(text)); }
+      );
     } else {
-      var ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-        if (btn) flashCopied(btn);
-      } catch (e) {}
-      document.body.removeChild(ta);
+      done(legacyCopy(text));
     }
   }
 
@@ -253,8 +267,16 @@
 
   startPolling();
 
-  // Seed home signature without forcing reload
+  // On home, record baseline signature without a full reload; do not force an
+  // immediate rescan (manual Refresh / poll interval handle updates).
   if ((body.getAttribute("data-page") || "/") === "/") {
-    softRefresh();
+    var ss = document.getElementById("stat-sessions");
+    var sa = document.querySelector(".stats-strip .stat .value");
+    if (ss) {
+      body.setAttribute(
+        "data-home-sig",
+        ss.textContent.trim() + ":init"
+      );
+    }
   }
 })();

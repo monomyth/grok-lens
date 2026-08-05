@@ -18,7 +18,7 @@ module GrokLens
     def slash_commands
       path = File.join(@grok_home, "docs", "user-guide", "04-slash-commands.md")
       if File.file?(path)
-        parse_slash_doc(File.read(path, encoding: "UTF-8"))
+        parse_slash_doc(read_text(path))
       else
         fallback_slash_commands
       end
@@ -40,12 +40,12 @@ module GrokLens
 
           seen[key] = true
           list << Skill.new(
-            name: meta[:name],
-            description: meta[:description],
-            source: source,
-            path: path,
+            name: utf8(meta[:name]),
+            description: utf8(meta[:description]),
+            source: utf8(source),
+            path: utf8(path),
             user_invocable: meta[:user_invocable],
-            plugin: plugin
+            plugin: plugin && utf8(plugin)
           )
         end
       end
@@ -67,11 +67,11 @@ module GrokLens
         desc = plugin_description(dir, entry)
         name = entry.sub(/-[0-9a-f]{8}$/i, "")
         Plugin.new(
-          id: entry,
-          name: name,
-          path: dir,
+          id: utf8(entry),
+          name: utf8(name),
+          path: utf8(dir),
           skill_count: skill_n,
-          description: desc
+          description: utf8(desc)
         )
       end.sort_by { |p| p.name.downcase }
     end
@@ -97,6 +97,31 @@ module GrokLens
 
     private
 
+    def utf8(str)
+      s = str.to_s
+      return "" if s.empty?
+
+      if s.encoding == Encoding::UTF_8 && s.valid_encoding?
+        s
+      else
+        s = s.dup.force_encoding(Encoding::UTF_8)
+        s = s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "") unless s.valid_encoding?
+        s
+      end
+    rescue StandardError
+      str.to_s.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "")
+    end
+
+    def read_text(path, max_bytes = nil)
+      data =
+        if max_bytes
+          File.open(path, "rb") { |f| f.read(max_bytes) }.to_s
+        else
+          File.binread(path)
+        end
+      utf8(data)
+    end
+
     def scan_skill_roots
       roots = []
       roots << ["user", File.join(@grok_home, "skills"), nil]
@@ -117,8 +142,8 @@ module GrokLens
     end
 
     def parse_skill(path)
-      text = File.read(path, encoding: "UTF-8")
-      name = File.basename(File.dirname(path))
+      text = read_text(path)
+      name = utf8(File.basename(File.dirname(path)))
       description = ""
       user_invocable = true
 
@@ -127,14 +152,13 @@ module GrokLens
         if parts.size >= 3
           begin
             fm = YAML.safe_load(parts[1], permitted_classes: [Symbol]) || {}
-            name = fm["name"].to_s if fm["name"]
+            name = utf8(fm["name"]) if fm["name"]
             description = clean_desc(fm["description"] || fm["short-description"] || "")
             if fm.key?("user-invocable")
               user_invocable = !!fm["user-invocable"]
             elsif fm.key?("user_invocable")
               user_invocable = !!fm["user_invocable"]
             end
-            # disable-model-invocation skills can still be slash-invocable
           rescue StandardError
             description = first_paragraph(parts[2] || text)
           end
@@ -147,23 +171,23 @@ module GrokLens
       description = clip(description, 220)
       return nil if name.to_s.empty?
 
-      { name: name, description: description, user_invocable: user_invocable }
+      { name: utf8(name), description: utf8(description), user_invocable: user_invocable }
     rescue StandardError
       nil
     end
 
     def clean_desc(text)
-      text.to_s.gsub(/\s+/, " ").strip
+      utf8(text).gsub(/\s+/, " ").strip
     end
 
     def first_paragraph(text)
-      lines = text.to_s.lines.map(&:strip)
-      lines.reject! { |l| l.empty? || l.start_with?("#") || l.start_with?("---") || l.start_with?("**") }
-      lines.first.to_s
+      lines = utf8(text).lines.map(&:strip)
+      lines.reject! { |l| l.empty? || l.start_with?("#") || l.start_with?("---") || l.start_with?("**") || l.start_with?("[!") }
+      utf8(lines.first.to_s)
     end
 
     def clip(text, n)
-      t = text.to_s.strip
+      t = utf8(text).strip
       return t if t.length <= n
 
       "#{t[0, n - 1]}…"
@@ -172,23 +196,23 @@ module GrokLens
     def plugin_description(dir, entry)
       readme = File.join(dir, "README.md")
       if File.file?(readme)
-        return clip(first_paragraph(File.read(readme, 2000)), 200)
+        return clip(first_paragraph(read_text(readme, 4000)), 200)
       end
 
-      # fall back to first skill description
       skill = Dir.glob(File.join(dir, "**", "SKILL.md")).first
       if skill
         meta = parse_skill(skill)
         return meta[:description] if meta
       end
 
-      "Installed plugin (#{entry})"
+      utf8("Installed plugin (#{entry})")
     end
 
     def parse_slash_doc(md)
       section = "General"
       commands = []
       current = nil
+      md = utf8(md)
 
       md.each_line do |line|
         if line =~ /^##\s+(.+)/
@@ -258,10 +282,10 @@ module GrokLens
       desc = clip(desc, 320)
       desc = "See Grok docs for details." if desc.empty?
       SlashCommand.new(
-        name: h[:name],
-        aliases: h[:aliases],
-        section: h[:section],
-        description: desc
+        name: utf8(h[:name]),
+        aliases: Array(h[:aliases]).map { |a| utf8(a) },
+        section: utf8(h[:section]),
+        description: utf8(desc)
       )
     end
 
