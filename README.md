@@ -4,24 +4,36 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruby](https://img.shields.io/badge/Ruby-%3E%3D%204.0-red.svg)](https://www.ruby-lang.org/)
 
-Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions and projects stored under `~/.grok`.
+Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions and projects under `~/.grok`.
 
-Ruby **4.x** · Sinatra · Tufte-inspired dense UI · snapshot on start
+Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
-> **Privacy:** Session data can include prompts and code. Grok Lens binds to `127.0.0.1` by default and never writes to `~/.grok`. See [SECURITY.md](SECURITY.md).
+> **Privacy:** Session data can include prompts and code. Binds to `127.0.0.1` by default and never writes to `~/.grok`. See [SECURITY.md](SECURITY.md).
 
 ## Features
 
-- **Projects** grouped by session working directory — path, short description, model mix, est. tokens
-- **Sessions** with status (**live** / **stale** / **idle**), title, model, turns, est. tokens
-- **Nested subagents** under parent sessions
-- **Session skim** — first user prompt, tool histogram, activity sparkline (not a full chat viewer)
-- **Light / dark / system** theme
-- Copy **session id** and ready-to-paste **`grok --cwd … --resume <id>`**
-- **Live polling** (default 5 minutes; 30s–10m or off — scans are typically 20–40ms)
-- **Slash-command glossary** and **installed plugins & skills** inventory
+- **Projects** by working directory — path, short description, model mix, est. tokens
+- **Sessions** — **live** / **stale** / **idle**, models, turns, est. tokens, context window
+- **Running tasks** — in-flight bg shells / tools / live subagents (with process/port liveness checks)
+- **Nested subagents** — `+N sub · K live`
+- **Search** — FTS over Grok’s `session_search.sqlite`
+- **Compare** — side-by-side metrics for two sessions
+- **Copy** session id and `grok --cwd … --resume <id>`
+- **Light / dark / system** theme (single cycle control)
+- **Live polling** with partial table updates (no full page reload on default sort)
+- **Glossary** of slash commands · **plugins & skills** inventory
+- Sort / filter sessions (last active, running, tokens, title; running-only)
 
-Token counts are **estimates** derived from on-disk artifact sizes (`chat_history` + `events`). Grok does not currently persist API token usage in session files.
+### Status meanings
+
+| Label | Meaning |
+|--------|---------|
+| **live** | A Grok process for this session is running (registry and/or `grok --resume …`) |
+| **stale** | Listed open but pid is dead |
+| **idle** | No live process |
+| **N running** | Live in-flight work units (bg shell, tool, subagent) after liveness checks |
+
+Token **lifetime** figures are **estimates** (hybrid: `signals.json` + on-disk sizes). **Context** comes from Grok’s `signals.json` when present. Optional napkin **cost** only if you set a rate (see below) — not real billing.
 
 ## Requirements
 
@@ -52,9 +64,9 @@ Open **http://127.0.0.1:9292**
 | `GROK_HOME` | `~/.grok` | Root of Grok Build data |
 | `HOST` | `127.0.0.1` | Bind address |
 | `PORT` | `9292` | HTTP port |
-| `GROK_LENS_POLL_SECONDS` | `300` | Default auto-refresh interval (UI can override; `0` = off) |
-| `GROK_LENS_USD_PER_M_TOKENS` | unset | Optional USD per 1M tokens for est. cost column |
-| `GROK_LENS_CONFIG` | `~/.grok-lens.yml` | Optional YAML (`usd_per_m_tokens`) |
+| `GROK_LENS_POLL_SECONDS` | `300` | Default auto-refresh (UI can override; `0` = off) |
+| `GROK_LENS_USD_PER_M_TOKENS` | unset | **Optional** USD per 1M tokens for est. cost — leave unset to hide cost |
+| `GROK_LENS_CONFIG` | `~/.grok-lens.yml` | Optional YAML (`usd_per_m_tokens`) — see `config.example.yml` |
 
 ```bash
 GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
@@ -70,11 +82,13 @@ Dual-home dashboard (synthetic demo data — not real session history):
 
 | Path | Use |
 |------|-----|
-| `~/.grok/sessions/<cwd>/<id>/summary.json` | Titles, models, message counts, times |
-| `events.jsonl` | Models per turn, tools, activity |
-| `chat_history.jsonl` | First user prompt; size for token estimate |
-| `active_sessions.json` | Active session IDs and PIDs |
-| `sessions/session_search.sqlite` | Optional title fallback |
+| `sessions/<cwd>/<id>/summary.json` | Titles, models, counts, times |
+| `signals.json` | Context tokens / window, turns, tools (when present) |
+| `events.jsonl` | Models, tools, activity sparkline |
+| `updates.jsonl` | In-flight / background tool status |
+| `chat_history.jsonl` | Opening message (wrappers stripped); size for est. |
+| `active_sessions.json` + process table | Live / stale sessions |
+| `sessions/session_search.sqlite` | FTS search |
 | Project `README.md` | Optional project description |
 
 ## Development
@@ -91,25 +105,19 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```
 grok-lens/
-  bin/grok-lens          # launcher
+  bin/grok-lens
   config.ru
-  lib/grok_lens/         # store, models, app
-  views/                 # ERB
-  public/                # CSS + minimal JS
-  test/                  # Minitest fixtures
-  docs/                  # design notes
+  config.example.yml
+  lib/grok_lens/     # store, estimate, search, catalog, app
+  views/
+  public/
+  test/
+  docs/
 ```
-
-## Roadmap
-
-- Full-text search UI over the session search index
-- Real token telemetry when Grok writes usage fields
-- Optional “open cwd in terminal” / deep-link helpers
-- Partial DOM updates on poll (avoid full reload when lists change)
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) · Copyright (c) 2026 Eugene Ray
 
 ## Disclaimer
 

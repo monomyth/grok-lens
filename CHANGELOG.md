@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-08-05
+
+### Fixed
+
+- Running badge counts **all** live tasks (bg shells, tools, subagents), not bg-only
+
+### Changed
+
+- README refreshed for v0.3 features and status meanings
+
 ## [0.3.0] — 2026-08-05
 
 ### Added
@@ -16,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Home sort (last active / running / tokens / title) and “running only” filter
 - Subagent badge `+N sub · K live`
 - Partial poll re-renders Active/Recent tables without full page reload
-- Tighter running-task liveness (session pid descendants + ports; badge = bg + subagents)
+- Running-task detection from `updates.jsonl` with process/port liveness
 
 ## [0.2.0] — 2026-07-28
 
@@ -47,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixture-based unit and Rack tests
 - Tufte-inspired dense paper UI with SVG sparklines
 
+[0.3.1]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.1
 [0.3.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.0
 [0.2.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.1.0
