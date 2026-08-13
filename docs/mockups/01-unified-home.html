@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Lens mockup — unified home</title>
+<style>
+:root { --paper:#f7f4ef; --ink:#1a1a1a; --muted:#5c5c5c; --rule:#c8c2b8; --soft:#e0dbd2;
+  --sans:"Avenir Next",system-ui,sans-serif; --serif:Georgia,serif; --mono:ui-monospace,Menlo,monospace; }
+html[data-theme="dark"] { --paper:#141414; --ink:#e8e4dc; --muted:#9a948a; --rule:#3a3834; --soft:#2a2824; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.4 var(--serif); }
+.page { max-width:1100px; margin:0 auto; padding:1.25rem 1.5rem 3rem; }
+header { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:1rem;
+  border-bottom:1px solid var(--ink); padding-bottom:.55rem; margin-bottom:1.2rem; }
+.logo { font-family:var(--sans); font-weight:650; text-decoration:none; color:var(--ink); }
+.nav { font-family:var(--sans); font-size:.78rem; display:flex; gap:.75rem; }
+.nav a { color:var(--muted); text-decoration:none; border-bottom:1px solid var(--ink); color:var(--ink); }
+.muted { color:var(--muted); font-size:.82rem; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:.85rem; margin-bottom:1.2rem; }
+.stat { border-left:2px solid var(--ink); padding-left:.65rem; }
+.stat .l { font-family:var(--sans); font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+.stat .v { font-size:1.55rem; font-variant-numeric:tabular-nums; }
+.chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1rem; font-family:var(--sans); font-size:.75rem; }
+.chip { border:1px solid var(--ink); padding:.15rem .5rem; }
+.chip.on { background:var(--ink); color:var(--paper); }
+table { width:100%; border-collapse:collapse; font-size:.9rem; }
+th { font-family:var(--sans); font-size:.68rem; font-weight:500; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); text-align:left; padding:.2rem .45rem .35rem 0; border-bottom:.5px solid var(--rule); }
+td { padding:.4rem .45rem .4rem 0; border-top:.5px solid var(--soft); vertical-align:top; }
+.dot { display:inline-block; width:.45rem; height:.45rem; border-radius:50%; background:var(--ink); margin-right:.35rem; }
+.badge { font-family:var(--sans); font-size:.62rem; border:.5px solid var(--rule); padding:0 .28rem; margin-left:.25rem; color:var(--muted); }
+.src { font-family:var(--sans); font-size:.62rem; letter-spacing:.04em; text-transform:uppercase; }
+.r { text-align:right; font-variant-numeric:tabular-nums; }
+h2 { font-family:var(--sans); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
+  border-bottom:.5px solid var(--rule); padding-bottom:.25rem; }
+.note { font-size:.78rem; color:var(--muted); margin-top:1.5rem; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <a class="logo" href="#">Grok Lens</a>
+      <span class="muted">snapshot · all sources</span>
+      <nav class="nav"><a>Home</a> <span class="muted">Search</span> <span class="muted">Compare</span></nav>
+    </div>
+    <div class="muted">84 sessions · 12 projects · ~18.2M est.</div>
+  </header>
+  <section class="stats">
+    <div class="stat"><div class="l">Live</div><div class="v">6</div><div class="muted">3 grok · 2 cursor · 1 codex</div></div>
+    <div class="stat"><div class="l">Running tasks</div><div class="v">4</div><div class="muted">bg + tools</div></div>
+    <div class="stat"><div class="l">Est. tokens</div><div class="v">~18.2M</div><div class="muted">hybrid · grok signals</div></div>
+    <div class="stat"><div class="l">Sources</div><div class="v">3</div><div class="muted">read-only adapters</div></div>
+  </section>
+  <div class="chips">
+    <span class="chip on">All</span>
+    <span class="chip">Grok Build</span>
+    <span class="chip">Codex</span>
+    <span class="chip">Cursor</span>
+  </div>
+  <h2>Active now</h2>
+  <table>
+    <thead><tr><th>Src</th><th>Status</th><th>Project</th><th>Title</th><th class="r">Run</th><th class="r">Est.</th></tr></thead>
+    <tbody>
+      <tr><td class="src">Grok</td><td><span class="dot"></span>live</td><td>grok</td><td>Ruby session dashboard<span class="badge">2 running</span></td><td class="r">2</td><td class="r">~1.3M</td></tr>
+      <tr><td class="src">Cursor</td><td><span class="dot"></span>live</td><td>rust-variables</td><td>Ownership walkthrough</td><td class="r">—</td><td class="r">—</td></tr>
+      <tr><td class="src">Codex</td><td><span class="dot"></span>live</td><td>gubulator</td><td>Create Golden Ratio Solid Sequence</td><td class="r">1</td><td class="r">—</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Mockup — source chips filter one ledger. Tokens shown when the source records them (Grok signals); Codex/Cursor stay “—” until a mapped field exists.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Lens mockup — bot / Mobirok inbox</title>
+<style>
+:root { --paper:#f7f4ef; --ink:#1a1a1a; --muted:#5c5c5c; --rule:#c8c2b8; --soft:#e0dbd2;
+  --sans:"Avenir Next",system-ui,sans-serif; --serif:Georgia,serif; --mono:ui-monospace,Menlo,monospace; }
+body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.4 var(--serif); }
+.page { max-width:1100px; margin:0 auto; padding:1.25rem 1.5rem 3rem; }
+h1 { font-size:1.4rem; }
+.grid { display:grid; grid-template-columns:1.1fr .9fr; gap:1.5rem; }
+h2 { font-family:var(--sans); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
+  border-bottom:.5px solid var(--rule); padding-bottom:.25rem; }
+table { width:100%; border-collapse:collapse; font-size:.88rem; }
+td { padding:.4rem 0; border-top:.5px solid var(--soft); vertical-align:top; }
+.btn { font-family:var(--sans); font-size:.75rem; border:1px solid var(--ink); background:transparent; padding:.15rem .45rem; }
+.muted { color:var(--muted); font-size:.82rem; }
+.phone { border:1px solid var(--ink); padding:1rem .85rem; min-height:22rem; }
+.phone h3 { font-size:1rem; margin:.2rem 0 .8rem; font-family:var(--sans); }
+.card { border-top:.5px solid var(--soft); padding:.55rem 0; }
+.ok { font-family:var(--sans); font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="muted">Home · Bot</p>
+  <h1>Bot &amp; remote attach</h1>
+  <p class="muted">Lens stays read-only. Mobirok (or a future Telegram/X bot) is the write path: attach / prompt / approve.</p>
+  <div class="grid">
+    <div>
+      <h2>Mac relay (MobirokMac)</h2>
+      <table>
+        <tr><td>iCloud queue</td><td>OK</td></tr>
+        <tr><td>Published sessions</td><td>84</td></tr>
+        <tr><td>Attached now</td><td>1 · grok-lens session</td></tr>
+        <tr><td>Pending permission</td><td>run_terminal_command</td></tr>
+      </table>
+      <p><button class="btn">Refresh sessions.json</button> <button class="btn">Open queue folder</button></p>
+      <h2>Inbox (last events)</h2>
+      <table>
+        <tr><td class="muted">12:41</td><td>iOS attach 019f6183…</td></tr>
+        <tr><td class="muted">12:41</td><td>ACP session/load</td></tr>
+        <tr><td class="muted">12:42</td><td>permission requested</td></tr>
+      </table>
+    </div>
+    <div class="phone">
+      <div class="ok">Mobirok · Sessions</div>
+      <h3>Ruby session dashboard</h3>
+      <div class="card">live · 2 running · grok-4.5</div>
+      <div class="card">~/code/grok</div>
+      <div class="card">Open on Mac &amp; Continue</div>
+      <div class="card muted">Approve tool? run_terminal_command</div>
+      <p><button class="btn">Approve</button> <button class="btn">Deny</button></p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

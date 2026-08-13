@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Lens mockup — session detail</title>
+<style>
+:root { --paper:#f7f4ef; --ink:#1a1a1a; --muted:#5c5c5c; --rule:#c8c2b8; --soft:#e0dbd2;
+  --sans:"Avenir Next",system-ui,sans-serif; --serif:Georgia,serif; --mono:ui-monospace,Menlo,monospace; }
+body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.4 var(--serif); }
+.page { max-width:1100px; margin:0 auto; padding:1.25rem 1.5rem 3rem; }
+.crumb { font-family:var(--sans); font-size:.78rem; color:var(--muted); margin-bottom:.75rem; }
+h1 { font-size:1.45rem; margin:.3rem 0; }
+.path { font-family:var(--mono); font-size:.75rem; color:var(--muted); }
+.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.7rem 1rem; margin:1rem 0; font-size:.9rem; }
+.l { font-family:var(--sans); font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); display:block; }
+.copy { display:flex; gap:.4rem; align-items:center; margin:.7rem 0; }
+code { font-family:var(--mono); font-size:.75rem; border:.5px solid var(--soft); padding:.25rem .4rem; flex:1; }
+.btn { font-family:var(--sans); font-size:.75rem; border:1px solid var(--ink); background:transparent; padding:.15rem .45rem; }
+h2 { font-family:var(--sans); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
+  border-bottom:.5px solid var(--rule); padding-bottom:.25rem; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; }
+td { padding:.35rem 0; border-top:.5px solid var(--soft); }
+.badge { font-family:var(--sans); font-size:.62rem; border:.5px solid var(--rule); padding:0 .28rem; }
+.dot { display:inline-block; width:.45rem; height:.45rem; border-radius:50%; background:var(--ink); margin-right:.3rem; }
+.muted { color:var(--muted); font-size:.82rem; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="crumb">Home · grok · session</div>
+  <div class="muted"><span class="dot"></span>live · <span class="badge">Grok Build</span> · grok-4.5</div>
+  <h1>Ruby session dashboard with Tufte graphs</h1>
+  <p class="path">~/code/grok</p>
+  <div class="grid">
+    <div><span class="l">Context</span>317k / 500k (63%)</div>
+    <div><span class="l">Est. tokens</span>~1.3M hybrid</div>
+    <div><span class="l">Running</span>2</div>
+    <div><span class="l">Subagents</span>0</div>
+  </div>
+  <div class="copy">
+    <code>019f6183-7c59-7d62-b1d3-639e481849e7</code>
+    <button class="btn">Copy id</button>
+  </div>
+  <div class="copy">
+    <code>grok --cwd ~/code/grok --resume 019f6183-7c59-7d62-b1d3-639e481849e7</code>
+    <button class="btn">Copy resume</button>
+  </div>
+  <h2>Running now (2)</h2>
+  <table>
+    <tr><td><span class="badge">bg_shell</span></td><td>rackup :9296</td><td><span class="dot"></span>in_progress</td></tr>
+    <tr><td><span class="badge">tool</span></td><td>Scan session store</td><td><span class="dot"></span>running</td></tr>
+  </table>
+  <h2>Open elsewhere</h2>
+  <p class="muted">Mobirok: attach from iPhone · same session id via ACP <code>session/load</code>.</p>
+</div>
+</body>
+</html>
