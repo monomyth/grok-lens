@@ -29,17 +29,18 @@ module GrokLens
 
     helpers do
       def snapshot
-        settings.snapshot_mutex.synchronize do
-          settings.snapshot ||= timed_scan
-        end
+        cached = settings.snapshot_mutex.synchronize { settings.snapshot }
+        return cached if cached
+
+        refresh_snapshot!
       end
 
       def refresh_snapshot!
-        settings.snapshot_mutex.synchronize do
-          # clear process memo between scans
-          settings.store.instance_variable_set(:@process_command_index, nil)
-          settings.snapshot = timed_scan
-        end
+        # Scan off the mutex so requests can still serve the previous snapshot.
+        settings.store.instance_variable_set(:@process_command_index, nil)
+        snap = timed_scan
+        settings.snapshot_mutex.synchronize { settings.snapshot = snap }
+        snap
       end
 
       def timed_scan
@@ -152,9 +153,10 @@ module GrokLens
 
     get "/projects/*" do
       @snap = snapshot
-      path = "/#{params["splat"].first}"
-      @project = @snap.projects.find { |p| p.path == path || p.id == params["splat"].first || p.path.end_with?(path) }
-      @project ||= @snap.projects.find { |p| p.id == params["splat"].first.tr("/", "-") }
+      raw = params["splat"].first.to_s
+      path = raw.start_with?("/") ? raw : "/#{raw}"
+      matches = @snap.projects.select { |p| p.id == raw || p.path == raw || p.path == path }
+      @project = matches.size == 1 ? matches.first : nil
       halt 404, erb(:not_found) unless @project
       erb :project
     end
@@ -195,7 +197,7 @@ module GrokLens
         warnings: snap.warnings.size,
         models_hist: snap.models_hist,
         active_sessions: snap.active_sessions.map { |s| session_json(s) },
-        recent_sessions: snap.primary_sessions.first(60).map { |s| session_json(s) },
+        recent_sessions: snap.primary_sessions.map { |s| session_json(s) },
         projects_list: snap.projects.map { |p|
           {
             id: p.id,

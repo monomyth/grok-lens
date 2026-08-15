@@ -2,8 +2,8 @@
 
 require "json"
 require "cgi"
+require "digest"
 require "time"
-require "set"
 
 module GrokLens
   class Store
@@ -52,16 +52,20 @@ module GrokLens
       end
 
       nest!(sessions)
-      # Attach live running tasks (bg tools / in-flight work) for live sessions only —
-      # avoids scanning multi‑MB updates.jsonl for every idle archive.
+      # Attach live running tasks for sessions that might have in-flight work:
+      # live OS process, or a child / meta.json still marked running.
       ps_index = process_command_index
       sessions.map! do |s|
-        next s unless s.active?
-
         dir = session_dir_for(s)
         next s unless dir
 
-        tasks = load_running_tasks(dir, s, ps_index)
+        metas = load_subagent_metas(dir)
+        needs_tasks = s.active? ||
+                      Array(s.children).any?(&:active?) ||
+                      metas.any? { |_id, meta| subagent_running?(meta["status"]) }
+        next s unless needs_tasks
+
+        tasks = load_running_tasks(dir, s, ps_index, metas: metas)
         s.with(running_tasks: tasks)
       end
 
@@ -185,14 +189,71 @@ module GrokLens
 
       # Grok sometimes leaves a live process out of active_sessions.json
       # (e.g. `grok --resume <uuid>`). Discover those from the process table.
+      resolve_registry_pid_ownership(map)
       discover_live_from_processes(map, warnings)
       map
     end
 
     UUID_INLINE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
+    # Registry rows often share a still-living PID after resume. If that
+    # process's command line names a different session UUID, drop the stale claim.
+    def resolve_registry_pid_ownership(map)
+      by_pid = Hash.new { |h, k| h[k] = [] }
+      map.each do |id, info|
+        pid = info[:pid].to_i
+        next unless pid.positive?
+
+        by_pid[pid] << id
+      end
+
+      by_pid.each do |pid, ids|
+        next unless pid_alive?(pid)
+
+        cmd = pid_command(pid)
+        next if cmd.strip.empty?
+        next unless grok_like_process?(cmd)
+
+        mentioned = cmd.scan(UUID_INLINE)
+        if mentioned.any?
+          mentioned_down = mentioned.map(&:downcase)
+          ids.each do |id|
+            map.delete(id) unless mentioned_down.include?(id.downcase)
+          end
+        end
+
+        remain = ids.select { |id| map.key?(id) }
+        next if remain.size <= 1
+
+        keep =
+          if mentioned.any?
+            hit = mentioned.find { |u| remain.any? { |id| id.casecmp?(u) } }
+            remain.find { |id| id.casecmp?(hit.to_s) } if hit
+          end
+        keep ||= remain.max_by { |id| map[id][:opened_at] || Time.at(0) }
+        remain.each { |id| map.delete(id) unless id == keep }
+      end
+    end
+
+    def grok_like_process?(cmd)
+      s = cmd.to_s
+      s.match?(%r{(?:^|[/\s])grok(?:\s|$)}i) || s.include?("--resume") || s.include?("--continue")
+    end
+
+    def process_table
+      `ps -ax -o pid=,command= 2>/dev/null`.to_s
+    end
+
+    def pid_command(pid)
+      return "" if pid.nil?
+
+      `ps -p #{pid.to_i} -o command= 2>/dev/null`.to_s
+    rescue StandardError
+      ""
+    end
+
     def discover_live_from_processes(map, warnings)
-      out = `ps -ax -o pid=,command= 2>/dev/null`
+      out = process_table
       return if out.nil? || out.empty?
 
       out.each_line do |line|
@@ -319,7 +380,9 @@ module GrokLens
     TERMINAL_STATUSES = %w[completed failed cancelled error rejected success].freeze
     FOREGROUND_STALE_SECS = 180
 
-    def load_running_tasks(session_dir, session, ps_index = nil)
+    SUBAGENT_RUNNING = %w[running in_progress started active].freeze
+
+    def load_running_tasks(session_dir, session, ps_index = nil, metas: nil)
       ps_index ||= process_command_index
       tasks = []
       updates = File.join(session_dir, "updates.jsonl")
@@ -327,8 +390,6 @@ module GrokLens
         open_calls = parse_open_tool_calls(updates)
         open_calls.each do |cid, info|
           live = task_live?(info, ps_index, session)
-          next unless live || info[:bg] # still show bg only if live; skip dead
-
           next unless live
 
           title = short_task_title(info)
@@ -344,7 +405,7 @@ module GrokLens
         end
       end
 
-      # Live subagents under this session
+      # Live subagents under this session (own OS pid, or in-process via meta.json)
       Array(session.children).each do |child|
         next unless child.active?
 
@@ -358,9 +419,49 @@ module GrokLens
         )
       end
 
+      metas = load_subagent_metas(session_dir) if metas.nil?
+      metas.each do |cid, meta|
+        next unless subagent_running?(meta["status"])
+        next if tasks.any? { |t| t.id == cid }
+
+        desc = meta["description"].to_s.strip
+        tasks << RunningTask.new(
+          id: cid,
+          kind: :subagent,
+          title: desc.empty? ? "subagent #{cid[0, 8]}" : clip_sentence(desc, 100),
+          status: meta["status"].to_s,
+          tool_name: meta["effective_model_id"],
+          live: true
+        )
+      end
+
       tasks
     rescue StandardError
       []
+    end
+
+    def load_subagent_metas(session_dir)
+      root = File.join(session_dir, "subagents")
+      return {} unless Dir.exist?(root)
+
+      metas = {}
+      Dir.children(root).each do |cid|
+        next unless cid.match?(UUID_RE)
+
+        path = File.join(root, cid, "meta.json")
+        next unless File.file?(path)
+
+        begin
+          metas[cid] = JSON.parse(File.read(path))
+        rescue JSON::ParserError, Errno::ENOENT
+          next
+        end
+      end
+      metas
+    end
+
+    def subagent_running?(status)
+      SUBAGENT_RUNNING.include?(status.to_s.downcase)
     end
 
     def parse_open_tool_calls(updates_path, max_bytes: 2_500_000)
@@ -552,6 +653,7 @@ module GrokLens
         parent_of[s.id] = s.parent_id if s.parent_id && by_id[s.parent_id]
       end
 
+      running_from_meta = {}
       sessions.each do |s|
         dir = session_dir_for(s)
         next unless dir
@@ -565,6 +667,11 @@ module GrokLens
 
           parent_of[cid] = s.id
         end
+
+        load_subagent_metas(dir).each do |cid, meta|
+          parent_of[cid] = s.id if by_id[cid]
+          running_from_meta[cid] = true if subagent_running?(meta["status"])
+        end
       end
 
       children_map = Hash.new { |h, k| h[k] = [] }
@@ -577,9 +684,17 @@ module GrokLens
         kind = s.session_kind
         kind = "subagent" if parent_id && kind.to_s.empty?
         kids = children_map[s.id].filter_map { |cid| by_id[cid] }
-          .map { |c| c.with(parent_id: s.id, session_kind: c.session_kind || "subagent") }
+          .map { |c|
+            live = c.active? || running_from_meta[c.id]
+            c.with(
+              parent_id: s.id,
+              session_kind: c.session_kind || "subagent",
+              status: live ? :active : c.status
+            )
+          }
           .sort_by { |c| c.last_active_at || Time.at(0) }.reverse
-        s.with(parent_id: parent_id, session_kind: kind, children: kids)
+        own_status = running_from_meta[s.id] ? :active : s.status
+        s.with(parent_id: parent_id, session_kind: kind, children: kids, status: own_status)
       end
     end
 
@@ -612,7 +727,11 @@ module GrokLens
     end
 
     def project_id(path)
-      path.to_s.gsub(%r{[^a-zA-Z0-9]+}, "-").gsub(/^-|-$/, "")
+      raw = path.to_s
+      slug = raw.gsub(%r{[^a-zA-Z0-9]+}, "-").gsub(/\A-+|-+\z/, "")
+      slug = "project" if slug.empty?
+      digest = Digest::SHA256.hexdigest(raw)[0, 8]
+      "#{slug}-#{digest}"
     end
 
     def project_description(path, sessions)
@@ -646,9 +765,6 @@ module GrokLens
       sessions_root = File.join(@grok_home, "sessions")
       return nil unless Dir.exist?(sessions_root)
 
-      # Prefer encoded path from cwd
-      encoded = CGI.escape(session.cwd.to_s).gsub("+", "%20")
-      # Grok uses %2F encoding for slashes via CGI.escape on full path - actually dirs use %2F
       encoded = session.cwd.to_s.gsub("/", "%2F")
       candidate = File.join(sessions_root, encoded, session.id)
       return candidate if Dir.exist?(candidate)
@@ -689,6 +805,11 @@ module GrokLens
       Dir.glob(File.join(dir, "**", "*"), File::FNM_DOTMATCH).each do |f|
         next unless File.file?(f)
 
+        base = File.basename(f)
+        next if base == "updates.jsonl"
+        next if base.end_with?(".lock")
+        next if f.include?("#{File::SEPARATOR}terminal#{File::SEPARATOR}")
+
         total += File.size(f)
       rescue StandardError
         next
@@ -711,17 +832,18 @@ module GrokLens
     end
 
     def extract_first_user_prompt(chat_path, max_bytes: 2_000_000)
-      return nil if File.size(chat_path) > max_bytes
+      return nil unless File.file?(chat_path)
 
+      read = 0
       File.foreach(chat_path) do |line|
+        read += line.bytesize
         obj = JSON.parse(line)
-        next unless obj["type"] == "user"
-
-        text = flatten_content(obj["content"])
-        cleaned = scrub_prompt_wrappers(text)
-        next if cleaned.nil? || cleaned.empty?
-
-        return clip_sentence(cleaned, 500)
+        if obj["type"] == "user"
+          text = flatten_content(obj["content"])
+          cleaned = scrub_prompt_wrappers(text)
+          return clip_sentence(cleaned, 500) unless cleaned.nil? || cleaned.empty?
+        end
+        break if read >= max_bytes
       rescue JSON::ParserError
         next
       end

@@ -29,8 +29,7 @@
   </div>
 </section>
 
-<% if @snap.active_sessions.any? %>
-<section class="block" id="active-block">
+<section class="block" id="active-block"<%= @snap.active_sessions.any? ? "" : " hidden" %>>
   <h2 class="section-title">Active now</h2>
   <table class="ledger" id="active-table">
     <thead>
@@ -69,7 +68,6 @@
     </tbody>
   </table>
 </section>
-<% end %>
 
 <section class="dual">
   <div class="col">
@@ -121,7 +119,7 @@
         </tr>
       </thead>
       <tbody id="recent-tbody">
-        <% @sorted_sessions.first(50).each do |s| %>
+        <% @sorted_sessions.each do |s| %>
           <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>">
             <td class="age muted num"><%= relative_time(s.last_active_at) %></td>
             <td>

@@ -146,4 +146,11 @@ module FixtureHelper
     data["session_kind"] = kind if kind
     File.write(File.join(dir, "summary.json"), JSON.pretty_generate(data))
   end
+
+  # Make a fixture PID look like a grok process that owns +session_id+.
+  def stub_registry_pid(store, pid, session_id)
+    store.define_singleton_method(:pid_command) do |p|
+      p.to_i == pid.to_i ? "grok --cwd /tmp/demo-project --resume #{session_id}" : ""
+    end
+  end
 end

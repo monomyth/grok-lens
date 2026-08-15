@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
 require_relative "test_helper"
+require "digest"
 
 class StoreTest < Minitest::Test
   def setup
     @home = File.join(ROOT, "tmp", "fixture-home")
     @ids = FixtureHelper.build_fixture_home(@home)
     @store = GrokLens::Store.new(grok_home: @home)
+    FixtureHelper.stub_registry_pid(@store, Process.pid, @ids[:parent_id])
   end
 
   def test_scan_finds_sessions_and_nests_subagents
@@ -58,6 +60,7 @@ class StoreTest < Minitest::Test
 
   def test_running_tasks_detects_live_bg_via_port
     store = GrokLens::Store.new(grok_home: @home)
+    FixtureHelper.stub_registry_pid(store, Process.pid, @ids[:parent_id])
     store.define_singleton_method(:port_listening?) { |port| port.to_i == 19_876 }
     store.define_singleton_method(:process_command_index) { ["python3 -m http.server 19876"] }
     snap = store.scan
@@ -72,15 +75,79 @@ class StoreTest < Minitest::Test
 
   def test_process_discovery_marks_live_resume
     store = GrokLens::Store.new(grok_home: @home)
+    FixtureHelper.stub_registry_pid(store, Process.pid, @ids[:parent_id])
     live_pid = Process.pid
     sid = @ids[:idle_id]
-    store.define_singleton_method(:`) do |_cmd|
+    store.define_singleton_method(:process_table) do
       "  #{live_pid} grok --resume #{sid}\n"
     end
     snap = store.scan
     sess = snap.session(sid)
     assert_equal :active, sess.status
     assert_equal live_pid, sess.pid
+  end
+
+  def test_shared_registry_pid_keeps_only_cmdline_owner
+    File.write(File.join(@home, "active_sessions.json"), JSON.pretty_generate([
+      { session_id: @ids[:parent_id], pid: Process.pid, cwd: @ids[:proj], opened_at: "2026-07-14T12:00:00Z" },
+      { session_id: @ids[:idle_id], pid: Process.pid, cwd: @ids[:proj], opened_at: "2026-07-14T11:00:00Z" }
+    ]))
+    store = GrokLens::Store.new(grok_home: @home)
+    FixtureHelper.stub_registry_pid(store, Process.pid, @ids[:parent_id])
+    store.define_singleton_method(:process_table) { "" }
+    snap = store.scan
+    assert_equal :active, snap.session(@ids[:parent_id]).status
+    refute_equal :active, snap.session(@ids[:idle_id]).status
+  end
+
+  def test_subagent_meta_running_counts_without_child_pid
+    parent_dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    meta_dir = File.join(parent_dir, "subagents", @ids[:child_id])
+    FileUtils.mkdir_p(meta_dir)
+    File.write(File.join(meta_dir, "meta.json"), JSON.pretty_generate(
+      "subagent_id" => @ids[:child_id],
+      "parent_session_id" => @ids[:parent_id],
+      "description" => "in-process helper",
+      "status" => "running",
+      "effective_model_id" => "grok-build"
+    ))
+    snap = @store.scan
+    parent = snap.session(@ids[:parent_id])
+    child = snap.session(@ids[:child_id])
+    assert child.active?, "meta.json running should mark the child live"
+    assert parent.running_tasks.any? { |t| t.id == @ids[:child_id] && t.kind == :subagent && t.live }
+    assert parent.live_children_count.positive?
+  end
+
+  def test_opening_message_reads_prefix_of_large_chat
+    path = File.join(@home, "huge-chat.jsonl")
+    File.write(path, [
+      { type: "system", content: "sys" }.to_json,
+      { type: "user", content: "<user_query>hello from the front</user_query>" }.to_json,
+      { type: "assistant", content: "ok" }.to_json,
+      ("x" * 3_000_000)
+    ].join("\n"))
+    text = @store.send(:extract_first_user_prompt, path)
+    assert_equal "hello from the front", text
+  end
+
+  def test_project_id_distinguishes_slash_and_hyphen_paths
+    a = @store.send(:project_id, "/foo/bar")
+    b = @store.send(:project_id, "/foo-bar")
+    refute_equal a, b
+    assert_match(/-#{Regexp.escape(Digest::SHA256.hexdigest("/foo/bar")[0, 8])}\z/, a)
+  end
+
+  def test_dir_size_skips_updates_jsonl
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    updates = File.join(dir, "updates.jsonl")
+    update_bytes = File.size(updates)
+    assert update_bytes.positive?
+    sized = @store.send(:dir_size, dir)
+    raw = Dir.glob(File.join(dir, "**", "*"), File::FNM_DOTMATCH)
+             .select { |f| File.file?(f) }
+             .sum { |f| File.size(f) }
+    assert sized <= raw - update_bytes
   end
 
   def test_estimate_format

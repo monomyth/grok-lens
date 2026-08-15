@@ -39,11 +39,11 @@
       </div>
       <div class="header-stats">
         <% if @snap && !@snap.missing_home %>
-          <span class="num" id="stat-sessions"><%= @snap.primary_sessions.size %></span> sessions
+          <span class="num" id="stat-header-sessions"><%= @snap.primary_sessions.size %></span> sessions
           <span class="sep">·</span>
           <span class="num" id="stat-projects"><%= @snap.projects.size %></span> projects
           <span class="sep">·</span>
-          <span class="num" id="stat-tokens"><%= est(@snap.total_est_tokens) %></span> est. tokens
+          <span class="num" id="stat-header-tokens"><%= est(@snap.total_est_tokens) %></span> est. tokens
         <% end %>
         <label class="poll-control" title="Auto-refresh interval">
           <select id="poll-interval" aria-label="Polling interval">

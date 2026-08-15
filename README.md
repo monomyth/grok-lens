@@ -20,7 +20,7 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 - **Compare** — side-by-side metrics for two sessions
 - **Copy** session id and `grok --cwd … --resume <id>`
 - **Light / dark / system** theme (single cycle control)
-- **Live polling** with partial table updates (no full page reload on default sort)
+- **Live polling** re-renders Active + Sessions (any sort/filter) without a full page reload
 - **Glossary** of slash commands · **plugins & skills** inventory
 - Sort / filter sessions (last active, running, tokens, title; running-only)
 

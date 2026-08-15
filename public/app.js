@@ -95,10 +95,23 @@
   });
 
   /* ---------- Filters ---------- */
+  function applyTextFilter() {
+    var input = document.getElementById("filter");
+    var q = input ? input.value.trim().toLowerCase() : "";
+    $all("#recent-tbody tr[data-filter]").forEach(function (row) {
+      var hay = (row.getAttribute("data-filter") || "").toLowerCase();
+      row.style.display = !q || hay.indexOf(q) !== -1 ? "" : "none";
+    });
+  }
+
   function bindFilter(inputId) {
     var input = document.getElementById(inputId);
     if (!input) return;
     input.addEventListener("input", function () {
+      if (inputId === "filter") {
+        applyTextFilter();
+        return;
+      }
       var q = input.value.trim().toLowerCase();
       $all("tr[data-filter]").forEach(function (row) {
         var hay = (row.getAttribute("data-filter") || "").toLowerCase();
@@ -165,7 +178,7 @@
     var runBadge = s.running_count > 0
       ? '<span class="badge live-tasks">' + s.running_count + ' running</span>'
       : '';
-    var ctx = s.context_tokens ? ' · ctx ' + esc(s.est_tokens_label && s.context_label ? s.context_label.split(' ')[0] : '') : '';
+    var ctx = s.context_tokens && s.context_label ? ' · ctx ' + esc(s.context_label) : '';
     var filter = [s.title, s.cwd, s.model, s.id].join(' ');
     return (
       '<tr data-id="' + esc(s.id) + '" data-filter="' + esc(filter) + '" data-running="' + esc(s.running_count) + '">' +
@@ -182,6 +195,41 @@
     );
   }
 
+  function setText(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function queryFlag(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  function currentSort() {
+    return queryFlag("sort") || "last_active";
+  }
+
+  function runningOnly() {
+    return queryFlag("running") === "1";
+  }
+
+  function sortSessionList(list) {
+    var key = currentSort();
+    var copy = list.slice();
+    copy.sort(function (a, b) {
+      if (key === "running") {
+        return (b.running_count || 0) - (a.running_count || 0);
+      }
+      if (key === "tokens") {
+        return (b.est_tokens || 0) - (a.est_tokens || 0);
+      }
+      if (key === "title") {
+        return String(a.title || "").localeCompare(String(b.title || ""), undefined, { sensitivity: "base" });
+      }
+      return String(b.last_active_at || "").localeCompare(String(a.last_active_at || ""));
+    });
+    return copy;
+  }
+
   function applySnapshot(data) {
     var meta = document.getElementById("snapshot-meta");
     if (meta && data.scanned_at) {
@@ -191,36 +239,33 @@
         "snapshot · " + stamp +
         (data.scan_ms != null ? " · " + data.scan_ms + "ms" : "");
     }
-    var el;
-    if ((el = document.getElementById("stat-live"))) el.textContent = data.active;
-    if ((el = document.getElementById("stat-stale"))) el.textContent = data.stale;
-    if ((el = document.getElementById("stat-running-total"))) el.textContent = data.total_running != null ? data.total_running : "—";
-    if ((el = document.getElementById("stat-sessions"))) el.textContent = data.primary_sessions;
-    if ((el = document.getElementById("stat-tokens"))) el.textContent = data.total_est_tokens_label;
-    if ((el = document.getElementById("stat-cost")) && data.total_cost_label) el.textContent = data.total_cost_label;
+    setText("stat-live", data.active);
+    setText("stat-stale", data.stale);
+    setText("stat-running-total", data.total_running != null ? data.total_running : "—");
+    setText("stat-sessions", data.primary_sessions);
+    setText("stat-header-sessions", data.primary_sessions);
+    setText("stat-tokens", data.total_est_tokens_label);
+    setText("stat-header-tokens", data.total_est_tokens_label);
+    if (data.total_cost_label) setText("stat-cost", data.total_cost_label);
 
+    var activeBlock = document.getElementById("active-block");
     var activeBody = document.getElementById("active-tbody");
-    if (activeBody && data.active_sessions) {
-      activeBody.innerHTML = data.active_sessions.map(renderActiveRow).join("");
+    var activeList = data.active_sessions || [];
+    if (activeBody) {
+      activeBody.innerHTML = activeList.map(renderActiveRow).join("");
     }
+    if (activeBlock) {
+      activeBlock.hidden = activeList.length === 0;
+    }
+
     var recentBody = document.getElementById("recent-tbody");
     if (recentBody && data.recent_sessions) {
-      // Preserve client sort/filter controls: only update if no custom sort query
-      var params = new URLSearchParams(window.location.search);
-      if (!params.get("sort") || params.get("sort") === "last_active") {
-        if (!params.get("running")) {
-          recentBody.innerHTML = data.recent_sessions.slice(0, 50).map(renderRecentRow).join("");
-        }
-      } else {
-        // Update running cells in place for existing rows
-        data.recent_sessions.forEach(function (s) {
-          var row = recentBody.querySelector('tr[data-id="' + s.id + '"]');
-          if (!row) return;
-          var cell = row.querySelector(".running-cell");
-          if (cell) cell.textContent = s.running_count > 0 ? s.running_count : "—";
-          row.setAttribute("data-running", s.running_count);
-        });
+      var list = data.recent_sessions.slice();
+      if (runningOnly()) {
+        list = list.filter(function (s) { return (s.running_count || 0) > 0; });
       }
+      recentBody.innerHTML = sortSessionList(list).map(renderRecentRow).join("");
+      applyTextFilter();
     }
   }
 

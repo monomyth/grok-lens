@@ -12,49 +12,49 @@ Grok Lens is a coherent read-only dashboard: snapshot + mutex, labeled hybrid es
 - File: lib/grok_lens/store.rb:271
 - Description: A session is marked `:active` whenever `active_sessions.json` lists it and `pid_alive?` succeeds. Grok leaves old rows in that registry; two session IDs often share one still-living PID after resume. `discover_live_from_processes` (store.rb:213) only overwrites an entry when the stored PID is already dead, so a live-but-wrong PID is never corrected. Those sessions appear as **live** on home, in `running_count` rollups, and in `/api/snapshot`.
 - Suggestion: After loading the registry, resolve each live PID’s command line (`ps -p`). If it contains a different session UUID, drop or downgrade the row. Optionally treat “same PID, newer `opened_at`” as the only live owner.
-- Status: open
+- Status: fixed in 0.3.2 (`resolve_registry_pid_ownership`)
 
 ### Issue 2 -- Severity: bug
 - File: lib/grok_lens/store.rb:347
 - Description: Live subagents are counted only when `child.active?` (i.e. the child has its own live OS PID). Real Grok subagents are usually in-process: `summary.json` has `session_kind: "subagent"` and often **no** `parent_session_id`; liveness is in `subagents/<uuid>/meta.json` (`status: "running"` / `"completed"`). `nest!` (store.rb:562) only uses directory names. Result: `+N sub · K live` and the parent’s running-task list miss work that is actually running.
 - Suggestion: When scanning `subagents/`, parse `meta.json` and treat `status == "running"` as live (session status and/or a `:subagent` `RunningTask`). Do not require `active_sessions.json` for children.
-- Status: open
+- Status: fixed in 0.3.2 (`subagents/*/meta.json` + `load_running_tasks`)
 
 ### Issue 3 -- Severity: bug
 - File: views/layout.erb:42
 - Description: `id="stat-sessions"` and `id="stat-tokens"` are used in the header (`layout.erb:42` / `layout.erb:46`) and again in the home stats strip (`views/home.erb:18` / `views/home.erb:23`). `document.getElementById` in `public/app.js:198` updates only the first node. Soft poll refreshes the header counts and leaves the large home figures stale.
 - Suggestion: Give the strip distinct ids (`stat-sessions-home`, `stat-tokens-home`) and update both, or update via a class / `querySelectorAll`.
-- Status: open
+- Status: fixed in 0.3.2 (`stat-header-*` vs strip ids)
 
 ### Issue 4 -- Severity: bug
 - File: views/home.erb:32
 - Description: The “Active now” table is rendered only when the first snapshot has `active_sessions`. Poll writes into `#active-tbody` (`public/app.js:202`) and does nothing if that node was never painted. A boot with no live sessions, then a later live session, never grows the table until a full page load. The inverse (all sessions going idle) leaves an empty table section rather than hiding it.
 - Suggestion: Always emit `#active-block` / `#active-tbody` (hide with CSS when empty) and let `applySnapshot` show/hide from `data.active_sessions`.
-- Status: open
+- Status: fixed in 0.3.2 (always emit `#active-block`, hide when empty)
 
 ### Issue 5 -- Severity: bug
 - File: views/home.erb:124
 - Description: Home lists `@sorted_sessions.first(50)` only. The client filter (`public/app.js:109`) searches `tr[data-filter]` in that slice. `/api/snapshot` also returns `primary_sessions.first(60)` (`lib/grok_lens/app.rb:198`). Installs with more than 50 primaries cannot find older sessions via Home → Filter, which the UI presents as a full-ledger filter. Design goal was to view all sessions.
 - Suggestion: Paginate or raise the cap server-side; apply Filter/sort across the full primary list (or send ids+titles for the filter even if the table is windowed). Point the in-page filter at `/search` when the user has more than N sessions.
-- Status: open
+- Status: fixed in 0.3.2 (full primary list; API returns all)
 
 ### Issue 6 -- Severity: bug
 - File: public/app.js:207
 - Description: Soft poll only replaces `#recent-tbody` when sort is default and `running` is unset. That replacement does not re-apply `#filter`, so a typed filter flashes back to the unfiltered 50. If `?running=1`, the branch neither replaces rows nor patches running cells — the table is frozen. Custom sort only patches `.running-cell`, so titles, tokens, and new sessions stay stale.
 - Suggestion: Re-render from `data.recent_sessions` (or a dedicated `/api/sessions` list) using the current sort/filter, then re-run the client filter function. At minimum, after `innerHTML = …`, re-apply the current `#filter` value.
-- Status: open
+- Status: fixed in 0.3.2 (always re-render + re-apply filter)
 
 ### Issue 7 -- Severity: bug
 - File: lib/grok_lens/app.rb:156
 - Description: Project lookup is `path ==`, `id ==`, or `p.path.end_with?(path)` where `path` is `"/" + splat`. `/projects/grok` matches any cwd ending in `/grok`; `/projects/tmp` matches `/var/tmp` as well as `/tmp`. `project_id` (`lib/grok_lens/store.rb:615`) collapses `/foo/bar` and `/foo-bar` to the same slug, so two projects can share one URL and the first `find` wins.
 - Suggestion: Prefer exact `id` then exact `path`. Drop `end_with?` or require a unique match. Make `project_id` collision-resistant (e.g. hex of the path, or keep `%2F` encoding).
-- Status: open
+- Status: fixed in 0.3.2 (exact id/path; digest suffix on `project_id`)
 
 ### Issue 8 -- Severity: bug
 - File: lib/grok_lens/store.rb:713
 - Description: `extract_first_user_prompt` returns `nil` if `chat_history.jsonl` is larger than 2 MB, instead of reading a prefix. Long sessions (typical once tool results land in chat history) then omit “Opening message” even though the first real `<user_query>` is in the first few records. Wrapper scrubbing itself is correct; the size gate is not.
 - Suggestion: Stream from the start with a byte/line budget (stop after N bytes or first cleaned user prompt). Do not skip the file because its *total* size is large.
-- Status: open
+- Status: fixed in 0.3.2 (stream from start with a byte budget)
 
 ### Issue 9 -- Severity: suggestion
 - File: lib/grok_lens/store.rb:366

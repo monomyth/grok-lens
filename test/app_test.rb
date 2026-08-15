@@ -12,10 +12,16 @@ class AppTest < Minitest::Test
   def setup
     @home = File.join(ROOT, "tmp", "fixture-home-app")
     @ids = FixtureHelper.build_fixture_home(@home)
-    GrokLens::App.set :store, GrokLens::Store.new(grok_home: @home)
+    store = GrokLens::Store.new(grok_home: @home)
+    FixtureHelper.stub_registry_pid(store, Process.pid, @ids[:parent_id])
+    GrokLens::App.set :store, store
     GrokLens::App.set :catalog, GrokLens::Catalog.new(grok_home: @home)
     GrokLens::App.set :snapshot, nil
     GrokLens::App.set :last_scan_ms, nil
+  end
+
+  def project_slug
+    GrokLens::App.settings.store.scan.projects.first.id
   end
 
   def test_home_ok
@@ -34,9 +40,50 @@ class AppTest < Minitest::Test
   end
 
   def test_project_page
-    get "/projects/tmp-demo-project"
+    get "/projects/#{project_slug}"
     assert last_response.ok?
     assert_match(/Parent Session Title/, last_response.body)
+  end
+
+  def test_project_route_rejects_path_suffix
+    get "/projects/demo-project"
+    assert_equal 404, last_response.status
+  end
+
+  def test_home_always_emits_active_block
+    get "/"
+    assert last_response.ok?
+    assert_match(/id="active-block"/, last_response.body)
+    assert_match(/id="stat-header-sessions"/, last_response.body)
+    assert_match(/id="stat-sessions"/, last_response.body)
+    refute_match(/id="stat-header-sessions".*id="stat-header-sessions"/m, last_response.body)
+  end
+
+  def test_home_lists_all_primaries
+    encoded = "/tmp/demo-project".gsub("/", "%2F")
+    52.times do |i|
+      sid = format("44444444-4444-4444-4444-%012d", i)
+      dir = File.join(@home, "sessions", encoded, sid)
+      FileUtils.mkdir_p(dir)
+      FixtureHelper.write_summary(
+        dir, sid, "/tmp/demo-project",
+        title: "Extra Session #{i}",
+        summary: "bulk",
+        model: "grok-4.5",
+        turns: 1,
+        messages: 2
+      )
+      File.write(File.join(dir, "chat_history.jsonl"), "z")
+    end
+    GrokLens::App.set :snapshot, nil
+    get "/"
+    assert last_response.ok?
+    assert_match(/Extra Session 51/, last_response.body)
+
+    get "/api/snapshot?refresh=1"
+    assert last_response.ok?
+    body = JSON.parse(last_response.body)
+    assert body["recent_sessions"].size >= 54
   end
 
   def test_refresh

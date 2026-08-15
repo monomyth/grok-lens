@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-08-14
+
+### Fixed
+
+- Registry PID is live only if the process command line owns that session UUID (shared/stale `active_sessions.json` rows)
+- In-process subagents with `subagents/*/meta.json` `status: running` count as live (no child OS PID required)
+- Home poll updates both header and stats-strip counts (duplicate `id`s removed)
+- “Active now” is always in the DOM so a later live session appears without a full reload
+- Home list and `/api/snapshot` include every primary session (no 50/60 cap)
+- Soft poll re-renders the session table for any sort/filter and re-applies the typed filter
+- Project URLs match exact `id` or exact path; `project_id` includes a path digest so `/foo/bar` ≠ `/foo-bar`
+- Opening message streams the start of large `chat_history.jsonl` instead of skipping the file
+
+### Changed
+
+- Snapshot scan runs off the request mutex; readers keep the previous snapshot until swap
+- `dir_size` skips `updates.jsonl`, `*.lock`, and `terminal/` logs
+- Session detail timestamps print `UTC`
+
 ## [0.3.1] — 2026-08-05
 
 ### Fixed
@@ -57,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixture-based unit and Rack tests
 - Tufte-inspired dense paper UI with SVG sparklines
 
+[0.3.2]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.2
 [0.3.1]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.1
 [0.3.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.0
 [0.2.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.2.0
