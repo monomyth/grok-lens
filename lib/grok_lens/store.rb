@@ -52,6 +52,8 @@ module GrokLens
       end
 
       nest!(sessions)
+      sessions.concat(Codex.new.scan(warnings))
+      sessions.concat(Cursor.new.scan(warnings))
       # Attach live running tasks for sessions that might have in-flight work:
       # live OS process, or a child / meta.json still marked running.
       ps_index = process_command_index
@@ -74,6 +76,7 @@ module GrokLens
 
     def enrich_session(session)
       return session if session.nil? || session.detail_loaded
+      return session.with(detail_loaded: true) if session.respond_to?(:source_key) && session.source_key != :grok
 
       dir = session_dir_for(session)
       return session.with(detail_loaded: true) unless dir && Dir.exist?(dir)
@@ -768,6 +771,8 @@ module GrokLens
     end
 
     def session_dir_for(session)
+      return nil if session.respond_to?(:source_key) && session.source_key != :grok
+
       sessions_root = File.join(@grok_home, "sessions")
       return nil unless Dir.exist?(sessions_root)
 

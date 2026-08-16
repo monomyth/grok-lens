@@ -160,7 +160,44 @@ class AppTest < Minitest::Test
     get "/", sort: "tokens", running: "1"
     assert last_response.ok?
     assert_match(/Running only/i, last_response.body)
-    assert_match(/Grok Bot/, last_response.body)
+    assert_match(/id="nav-bot"[^>]*hidden/, last_response.body)
+    assert_match(/id="bot-home-block"[^>]*hidden/, last_response.body)
+    refute_match(/No roster on this Mac/, last_response.body)
+    refute_match(/href="\/codex"/, last_response.body)
+    refute_match(/href="\/cursor"/, last_response.body)
+    refute_match(/aria-label="Source"/, last_response.body)
+  end
+
+  def test_home_source_chips_only_when_discovered
+    grok = @home
+    codex = File.join(ROOT, "tmp", "fixture-codex-app")
+    ids = FixtureHelper.build_codex_home(codex)
+    ENV["GROK_LENS_CODEX"] = "1"
+    ENV["GROK_LENS_CODEX_HOME"] = codex
+    store = GrokLens::Store.new(grok_home: grok)
+    FixtureHelper.stub_registry_pid(store, Process.pid, @ids[:parent_id])
+    GrokLens::App.set :store, store
+    GrokLens::App.set :snapshot, nil
+    get "/"
+    assert last_response.ok?
+    assert_match(/aria-label="Source"/, last_response.body)
+    assert_match(/Codex/, last_response.body)
+    refute_match(/>Cursor</, last_response.body)
+    get "/", src: "codex"
+    assert last_response.ok?
+    assert_match(/Build the demo API/, last_response.body)
+    get "/sessions/#{ids[:id]}"
+    assert last_response.ok?
+    assert_match(/codex resume/, last_response.body)
+  ensure
+    ENV["GROK_LENS_CODEX"] = "0"
+    ENV.delete("GROK_LENS_CODEX_HOME")
+    GrokLens::App.set :snapshot, nil
+  end
+
+  def test_bot_undiscovered_is_404
+    get "/bot"
+    assert_equal 404, last_response.status
   end
 
   def test_bot_roster_route

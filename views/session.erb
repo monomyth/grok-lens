@@ -50,12 +50,11 @@
       <code class="copy-value" id="session-id"><%= h(@session.id) %></code>
       <button type="button" class="btn small" data-copy-text="<%= h(@session.id) %>">Copy id</button>
     </div>
+    <% if (cmd = resume_command(@session)) %>
     <div class="copy-row">
-      <code class="copy-value mono" id="resume-cmd"><%= h(resume_command(@session)) %></code>
-      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>"><%= @session.bot? ? "Copy open" : "Copy resume" %></button>
+      <code class="copy-value mono" id="resume-cmd"><%= h(cmd) %></code>
+      <button type="button" class="btn small" data-copy-text="<%= h(cmd) %>">Copy resume</button>
     </div>
-    <% if @session.bot? %>
-      <p class="muted" style="margin-top:.35rem">Local replica only. Work runs on the Grok Bot computer — Lens does not attach or send prompts.</p>
     <% end %>
   </div>
 </header>

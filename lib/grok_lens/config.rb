@@ -39,6 +39,42 @@ module GrokLens
       ENV.fetch("GROK_LENS_GROK_BOT_HOME", File.expand_path("~/.grokbot"))
     end
 
+    def optional_on?(key)
+      raw = ENV[key]
+      return false if raw && %w[0 false off no].include?(raw.strip.downcase)
+
+      true
+    end
+
+    def optional_required?(key)
+      raw = ENV[key]
+      raw && %w[1 true on yes].include?(raw.strip.downcase)
+    end
+
+    def codex_enabled?
+      optional_on?("GROK_LENS_CODEX")
+    end
+
+    def codex_required?
+      optional_required?("GROK_LENS_CODEX")
+    end
+
+    def codex_home
+      ENV.fetch("GROK_LENS_CODEX_HOME", File.expand_path("~/.codex"))
+    end
+
+    def cursor_enabled?
+      optional_on?("GROK_LENS_CURSOR")
+    end
+
+    def cursor_required?
+      optional_required?("GROK_LENS_CURSOR")
+    end
+
+    def cursor_home
+      ENV.fetch("GROK_LENS_CURSOR_HOME", File.expand_path("~/.cursor"))
+    end
+
     def poll_seconds
       raw = ENV["GROK_LENS_POLL_SECONDS"]
       return DEFAULT_POLL_SECONDS if raw.nil? || raw.strip.empty?

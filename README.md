@@ -14,7 +14,8 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
 - **Projects** by working directory — path, short description, model mix, est. tokens
 - **Sessions** — **live** / **stale** / **idle**, models, turns, est. tokens, context window
-- **Grok Bot** — separate agent roster (`/bot`): section, working/idle, activity skim when working
+- **Codex / Cursor** — optional session sources on Home (chips only if discovered)
+- **Grok Bot** — separate agent roster (`/bot`): section, working/idle, activity skim when working. Hidden unless agents are discovered
 - **Running tasks** — in-flight bg shells / tools / live subagents (with process/port liveness checks)
 - **Nested subagents** — `+N sub · K live`
 - **Search** — FTS over Grok’s `session_search.sqlite`
@@ -71,6 +72,10 @@ Open **http://127.0.0.1:9292**
 | `GROK_LENS_CONFIG` | `~/.grok-lens.yml` | Optional YAML (`usd_per_m_tokens`) — see `config.example.yml` |
 | `GROK_LENS_GROK_BOT` | on | Set `0` to hide Grok Bot agents |
 | `GROK_LENS_GROK_BOT_APP` | `~/Library/Application Support/Grok Bot` | Desktop persistence root |
+| `GROK_LENS_CODEX` | on | Set `0` to hide Codex |
+| `GROK_LENS_CODEX_HOME` | `~/.codex` | Codex data root |
+| `GROK_LENS_CURSOR` | on | Set `0` to hide Cursor |
+| `GROK_LENS_CURSOR_HOME` | `~/.cursor` | Cursor data root |
 
 ```bash
 GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
@@ -96,6 +101,8 @@ Dual-home dashboard (synthetic demo data — not real session history):
 | Project `README.md` | Optional project description |
 | `~/Library/Application Support/Grok Bot/sand-client-persistence` | Grok Bot roster + transcript replicas |
 | `…/sand-session-marker.json` | Grok Bot app liveness |
+| `~/.codex/session_index.jsonl` + `sessions/**/rollout-*.jsonl` | Codex threads (prefix only) |
+| `~/.cursor/projects/*/agent-transcripts` | Cursor agent transcripts |
 
 ## Development
 

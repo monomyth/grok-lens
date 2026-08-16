@@ -125,9 +125,12 @@ module GrokLens
       @sort = params["sort"].to_s
       @sort = "last_active" if @sort.empty?
       @filter_running = params["running"].to_s == "1"
+      @src = params["src"].to_s
       list = @snap.primary_sessions
+      list = list.select { |s| s.source_key.to_s == @src } unless @src.empty?
       list = list.select { |s| s.running_count.positive? } if @filter_running
       @sorted_sessions = sort_sessions(list, @sort)
+      @source_counts = @snap.primary_sessions.each_with_object(Hash.new(0)) { |s, h| h[s.source_key] += 1 }
       @bot_agents = bot_agents
       erb :home
     end
@@ -135,6 +138,7 @@ module GrokLens
     get "/bot" do
       @snap = snapshot
       @bot_agents = bot_agents
+      halt 404, erb(:not_found) if @bot_agents.empty?
       @bot_groups = Bot.new.grouped(@bot_agents)
       erb :bot
     end
@@ -319,7 +323,7 @@ module GrokLens
       def bot_summary_json(agents)
         list = Array(agents)
         {
-          available: Config.grok_bot_enabled?,
+          available: list.any?,
           total: list.size,
           working: list.count(&:working?),
           idle: list.count(&:idle?),

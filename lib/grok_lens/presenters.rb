@@ -24,8 +24,10 @@ module GrokLens
     # CLI to reopen a session in Grok Build TUI.
     # Prefer UUID resume with explicit cwd so it works outside the original directory.
     def resume_command(session)
-      if session.respond_to?(:bot?) && session.bot?
-        return 'open -a "Grok Bot"'
+      src = session.respond_to?(:source_key) ? session.source_key : :grok
+      return nil if src == :cursor || src == :bot
+      if src == :codex
+        return "codex resume #{Shellwords.escape(session.id.to_s)}"
       end
 
       cwd = session.cwd.to_s

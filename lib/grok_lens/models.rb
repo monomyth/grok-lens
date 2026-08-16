@@ -79,11 +79,16 @@ module GrokLens
     end
 
     def grok?
-      !bot?
+      source_key == :grok
     end
 
     def source_label
-      bot? ? "Grok Bot" : "Grok"
+      case source_key
+      when :bot then "Grok Bot"
+      when :codex then "Codex"
+      when :cursor then "Cursor"
+      else "Grok"
+      end
     end
 
     def with(**changes)

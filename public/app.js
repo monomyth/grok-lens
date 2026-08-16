@@ -181,8 +181,8 @@
       ? '<span class="badge live-tasks">' + s.running_count + ' running</span>'
       : '';
     var ctx = s.context_tokens && s.context_label ? ' · ctx ' + esc(s.context_label) : '';
-    var filter = [s.title, s.cwd, s.model, s.id, s.source_label, s.bot_section].join(' ');
-    var src = s.source_label
+    var filter = [s.title, s.cwd, s.model, s.id, s.source_label].join(' ');
+    var src = (s.source && s.source !== "grok" && s.source_label)
       ? '<span class="badge src">' + esc(s.source_label) + '</span> '
       : '';
     return (
@@ -257,8 +257,14 @@
     setText("stat-header-tokens", data.total_est_tokens_label);
     if (data.total_cost_label) setText("stat-cost", data.total_cost_label);
     if (data.bot) {
+      var hasBot = (data.bot.total || 0) > 0;
+      var navBot = document.getElementById("nav-bot");
+      if (navBot) navBot.hidden = !hasBot;
+      var botHome = document.getElementById("bot-home-block");
+      if (botHome) botHome.hidden = !hasBot;
       setText("bot-home-working", data.bot.working);
       setText("bot-home-idle", data.bot.idle);
+      setText("bot-home-total", data.bot.total);
       setText("bot-working-count", data.bot.working);
       setText("bot-idle-count", data.bot.idle);
     }
@@ -277,8 +283,7 @@
     if (recentBody && data.recent_sessions) {
       var list = data.recent_sessions.slice();
       var src = sourceFilter();
-      if (src === "bot") list = list.filter(function (s) { return s.source === "bot"; });
-      if (src === "grok") list = list.filter(function (s) { return s.source !== "bot"; });
+      if (src) list = list.filter(function (s) { return s.source === src; });
       if (runningOnly()) {
         list = list.filter(function (s) { return (s.running_count || 0) > 0; });
       }

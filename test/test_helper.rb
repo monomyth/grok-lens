@@ -8,8 +8,10 @@ require "time"
 
 ROOT = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(ROOT, "lib"))
-# Default tests should not read the developer's live Grok Bot install.
+# Default tests should not read the developer's live extra sources.
 ENV["GROK_LENS_GROK_BOT"] ||= "0"
+ENV["GROK_LENS_CODEX"] ||= "0"
+ENV["GROK_LENS_CURSOR"] ||= "0"
 require "grok_lens"
 
 module FixtureHelper
@@ -221,6 +223,36 @@ module FixtureHelper
       "appVersion" => "0.20.0"
     ))
     { research_id: aid, inbox_id: bid, app: root }
+  end
+
+  def build_codex_home(root)
+    FileUtils.rm_rf(root)
+    FileUtils.mkdir_p(File.join(root, "sessions", "2026", "08", "01"))
+    sid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01"
+    File.write(File.join(root, "session_index.jsonl"), JSON.generate(
+      "id" => sid,
+      "thread_name" => "Build the demo API",
+      "updated_at" => "2026-08-01T12:00:00Z"
+    ) + "\n")
+    rollout = File.join(root, "sessions", "2026", "08", "01", "rollout-2026-08-01T12-00-00-#{sid}.jsonl")
+    File.write(rollout, [
+      { type: "session_meta", timestamp: "2026-08-01T12:00:00Z", payload: { cwd: "/tmp/codex-demo", session_id: sid } }.to_json,
+      { type: "turn_context", payload: { cwd: "/tmp/codex-demo", model: "gpt-5.6-sol" } }.to_json
+    ].join("\n") + "\n")
+    { id: sid, home: root }
+  end
+
+  def build_cursor_home(root)
+    FileUtils.rm_rf(root)
+    slug = "tmp-cursor-demo"
+    sid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02"
+    dir = File.join(root, "projects", slug, "agent-transcripts", sid)
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "#{sid}.jsonl"), [
+      { role: "user", message: { content: [{ type: "text", text: "<user_query>\nfix the rust borrow checker\n</user_query>" }] } }.to_json,
+      { role: "assistant", message: { content: [{ type: "text", text: "ok" }] } }.to_json
+    ].join("\n") + "\n")
+    { id: sid, home: root, slug: slug }
   end
 
   def write_bot_blob(dir, key, obj)

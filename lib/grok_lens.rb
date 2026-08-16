@@ -12,8 +12,10 @@ require_relative "grok_lens/catalog"
 require_relative "grok_lens/search"
 require_relative "grok_lens/store"
 require_relative "grok_lens/bot"
+require_relative "grok_lens/codex"
+require_relative "grok_lens/cursor"
 require_relative "grok_lens/app"
 
 module GrokLens
-  VERSION = "0.4.1"
+  VERSION = "0.5.0"
 end

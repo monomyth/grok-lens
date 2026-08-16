@@ -110,20 +110,21 @@ Lens stays **never writing** to `~/.grok`.
 - Refresh `docs/images/home.png`.
 - Fixture test for FTS + search 200.
 
-### P1 — adapter seam (2–3 d)
+### P1 — adapter seam (shipped 0.5.0)
 
 - `Source` enum: `grok | codex | cursor`
 - `Session.source`, filter chips on home
 - `GrokAdapter` = current Store extract
 - Home query `?src=grok`
+- **No empty stubs:** nav, home blocks, and source pages stay hidden / 404 until that source actually returns rows (Grok Bot already does this)
 
-### P2 — Codex adapter (2 d)
+### P2 — Codex adapter (shipped 0.5.0)
 
 - Index jsonl + one-line `session_meta`
 - Filter chip + resume command after CLI check
 - No full transcript viewer
 
-### P3 — Cursor adapter (2 d)
+### P3 — Cursor adapter (shipped 0.5.0)
 
 - Walk `~/.cursor/projects/*/agent-transcripts`
 - Title from first user message; cwd from slug

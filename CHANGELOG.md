@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-08-15
+
+### Added
+
+- Source seam: Grok Build, Codex, and Cursor sessions on one Home ledger
+- Codex adapter (`~/.codex/session_index.jsonl` + rollout `session_meta` prefix)
+- Cursor adapter (`~/.cursor/projects/*/agent-transcripts`)
+- Home source chips only for sources that returned rows
+- `codex resume <id>` copy on Codex detail; Cursor has no per-chat resume
+
+### Notes
+
+- Token counts are omitted for Codex/Cursor (no invented API usage)
+- Grok Bot stays a separate agent roster; Mobirok is not in this release
+- Disable with `GROK_LENS_CODEX=0` / `GROK_LENS_CURSOR=0`
+
 ## [0.4.1] — 2026-08-15
 
 ### Changed
@@ -100,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixture-based unit and Rack tests
 - Tufte-inspired dense paper UI with SVG sparklines
 
+[0.5.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.5.0
 [0.4.1]: https://github.com/monomyth/grok-lens/releases/tag/v0.4.1
 [0.4.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.4.0
 [0.3.2]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.2

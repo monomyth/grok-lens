@@ -29,26 +29,20 @@
   </div>
 </section>
 
-<% if GrokLens::Config.grok_bot_enabled? %>
-<section class="block" id="bot-home-block">
+<section class="block" id="bot-home-block"<%= Array(@bot_agents).any? ? "" : " hidden" %>>
   <h2 class="section-title"><a href="/bot">Grok Bot</a></h2>
   <p class="desc" id="bot-home-line">
-    <% working = Array(@bot_agents).count(&:working?) %>
-    <% idle = Array(@bot_agents).count(&:idle?) %>
-    <% if Array(@bot_agents).empty? %>
-      No roster on this Mac. <a href="/bot">Details</a>
-    <% else %>
-      <span class="num" id="bot-home-working"><%= working %></span> working
-      · <span class="num" id="bot-home-idle"><%= idle %></span> idle
-      · <%= Array(@bot_agents).size %> agents
-      <a href="/bot">Open roster</a>
-    <% end %>
+    <span class="num" id="bot-home-working"><%= Array(@bot_agents).count(&:working?) %></span> working
+    · <span class="num" id="bot-home-idle"><%= Array(@bot_agents).count(&:idle?) %></span> idle
+    · <span id="bot-home-total"><%= Array(@bot_agents).size %></span> agents
+    <a href="/bot">Roster</a>
   </p>
-  <% Array(@bot_agents).select(&:working?).first(3).each do |a| %>
-    <p class="desc bot-doing"><strong><%= h(a.name) %></strong> · <%= h(a.activity || "working") %></p>
-  <% end %>
+  <div id="bot-home-doing">
+    <% Array(@bot_agents).select(&:working?).first(3).each do |a| %>
+      <p class="desc bot-doing"><strong><%= h(a.name) %></strong> · <%= h(a.activity || "working") %></p>
+    <% end %>
+  </div>
 </section>
-<% end %>
 
 <section class="block" id="active-block"<%= @snap.active_sessions.any? ? "" : " hidden" %>>
   <h2 class="section-title">Active now</h2>
@@ -116,6 +110,22 @@
       <h2 class="section-title">Sessions</h2>
       <div class="toolbar">
         <form method="get" action="/" class="inline toolbar-form">
+          <% unless @src.to_s.empty? %><input type="hidden" name="src" value="<%= h(@src) %>"><% end %>
+          <% extras = [:codex, :cursor].select { |k| @source_counts[k].to_i.positive? } %>
+          <% if extras.any? %>
+            <div class="chips" role="navigation" aria-label="Source">
+              <a class="chip<%= @src.to_s.empty? ? " on" : "" %>" href="<%= home_query(sort: @sort, running: @filter_running) %>">All</a>
+              <% if @source_counts[:grok].to_i.positive? %>
+                <a class="chip<%= @src == "grok" ? " on" : "" %>" href="<%= home_query(src: "grok", sort: @sort, running: @filter_running) %>">Grok Build</a>
+              <% end %>
+              <% if @source_counts[:codex].to_i.positive? %>
+                <a class="chip<%= @src == "codex" ? " on" : "" %>" href="<%= home_query(src: "codex", sort: @sort, running: @filter_running) %>">Codex</a>
+              <% end %>
+              <% if @source_counts[:cursor].to_i.positive? %>
+                <a class="chip<%= @src == "cursor" ? " on" : "" %>" href="<%= home_query(src: "cursor", sort: @sort, running: @filter_running) %>">Cursor</a>
+              <% end %>
+            </div>
+          <% end %>
           <select name="sort" aria-label="Sort sessions" onchange="this.form.submit()">
             <option value="last_active" <%= @sort == "last_active" ? "selected" : "" %>>Last active</option>
             <option value="running" <%= @sort == "running" ? "selected" : "" %>>Running tasks</option>
@@ -141,10 +151,11 @@
       </thead>
       <tbody id="recent-tbody">
         <% @sorted_sessions.each do |s| %>
-          <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>">
+          <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id} #{s.source_label}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>" data-source="<%= h(s.source_key) %>">
             <td class="age muted num"><%= relative_time(s.last_active_at) %></td>
             <td>
               <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
+              <% unless s.grok? %><span class="badge src"><%= h(s.source_label) %></span><% end %>
               <% if s.children.any? %>
                 <span class="badge">+<%= s.children.size %> sub<% if s.live_children_count.positive? %> · <%= s.live_children_count %> live<% end %></span>
               <% end %>
