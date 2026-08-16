@@ -158,7 +158,9 @@
       '<td><span class="dot ' + esc(s.status) + '"></span>' + esc(s.status === "active" ? "live" : s.status) +
       (s.pid ? ' <span class="muted">pid ' + esc(s.pid) + '</span>' : '') + '</td>' +
       '<td class="mono">' + esc(s.project) + '</td>' +
-      '<td><a href="/sessions/' + esc(s.id) + '">' + esc(s.title) + '</a> ' + sub + runBadge +
+      '<td><a href="/sessions/' + esc(s.id) + '">' + esc(s.title) + '</a> ' +
+      (s.source_label ? '<span class="badge src">' + esc(s.source_label) + '</span> ' : '') +
+      sub + runBadge +
       '<div class="row actions">' +
       '<button type="button" class="btn small" data-copy-text="' + esc(s.id) + '">Id</button> ' +
       '<button type="button" class="btn small" data-copy-text="' + esc(s.resume_command) + '">Resume</button>' +
@@ -179,11 +181,14 @@
       ? '<span class="badge live-tasks">' + s.running_count + ' running</span>'
       : '';
     var ctx = s.context_tokens && s.context_label ? ' · ctx ' + esc(s.context_label) : '';
-    var filter = [s.title, s.cwd, s.model, s.id].join(' ');
+    var filter = [s.title, s.cwd, s.model, s.id, s.source_label, s.bot_section].join(' ');
+    var src = s.source_label
+      ? '<span class="badge src">' + esc(s.source_label) + '</span> '
+      : '';
     return (
-      '<tr data-id="' + esc(s.id) + '" data-filter="' + esc(filter) + '" data-running="' + esc(s.running_count) + '">' +
+      '<tr data-id="' + esc(s.id) + '" data-filter="' + esc(filter) + '" data-running="' + esc(s.running_count) + '" data-source="' + esc(s.source || '') + '">' +
       '<td class="age muted num">' + esc(s.last_active_rel || '—') + '</td>' +
-      '<td><a href="/sessions/' + esc(s.id) + '">' + esc(s.title) + '</a> ' + sub + runBadge +
+      '<td><a href="/sessions/' + esc(s.id) + '">' + esc(s.title) + '</a> ' + src + sub + runBadge +
       '<div class="subline muted">' + esc(s.project) + ' · ' + esc(s.model) + ' · ' + esc(s.num_turns) + ' turns' + ctx + '</div>' +
       '<div class="row actions">' +
       '<button type="button" class="btn small" data-copy-text="' + esc(s.id) + '">Id</button> ' +
@@ -210,6 +215,10 @@
 
   function runningOnly() {
     return queryFlag("running") === "1";
+  }
+
+  function sourceFilter() {
+    return queryFlag("src") || "";
   }
 
   function sortSessionList(list) {
@@ -261,6 +270,9 @@
     var recentBody = document.getElementById("recent-tbody");
     if (recentBody && data.recent_sessions) {
       var list = data.recent_sessions.slice();
+      var src = sourceFilter();
+      if (src === "bot") list = list.filter(function (s) { return s.source === "bot"; });
+      if (src === "grok") list = list.filter(function (s) { return s.source !== "bot"; });
       if (runningOnly()) {
         list = list.filter(function (s) { return (s.running_count || 0) > 0; });
       }

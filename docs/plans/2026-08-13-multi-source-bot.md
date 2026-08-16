@@ -1,7 +1,7 @@
 # Plan: multi-source sessions + Grok bot
 
 **Date:** 2026-08-13  
-**Status:** proposal (no code in this file)
+**Status:** proposal (Grok Bot *sessions* shipped in 0.4.0 as a Home source — not the Mobirok relay pane)
 
 ## Code review (current tree, v0.3.1)
 

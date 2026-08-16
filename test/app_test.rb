@@ -159,6 +159,7 @@ class AppTest < Minitest::Test
     get "/", sort: "tokens", running: "1"
     assert last_response.ok?
     assert_match(/Running only/i, last_response.body)
+    assert_match(/Grok Bot/, last_response.body)
   end
 
 

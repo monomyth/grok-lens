@@ -15,6 +15,30 @@ module GrokLens
       File.expand_path(ENV.fetch("GROK_HOME", File.expand_path("~/.grok")))
     end
 
+    # Grok Bot desktop app (https://x.ai/bot). Off with GROK_LENS_GROK_BOT=0.
+    def grok_bot_enabled?
+      raw = ENV["GROK_LENS_GROK_BOT"]
+      return false if raw && %w[0 false off no].include?(raw.strip.downcase)
+
+      true
+    end
+
+    def grok_bot_required?
+      raw = ENV["GROK_LENS_GROK_BOT"]
+      raw && %w[1 true on yes].include?(raw.strip.downcase)
+    end
+
+    def grok_bot_app_support
+      ENV.fetch(
+        "GROK_LENS_GROK_BOT_APP",
+        File.expand_path("~/Library/Application Support/Grok Bot")
+      )
+    end
+
+    def grok_bot_home
+      ENV.fetch("GROK_LENS_GROK_BOT_HOME", File.expand_path("~/.grokbot"))
+    end
+
     def poll_seconds
       raw = ENV["GROK_LENS_POLL_SECONDS"]
       return DEFAULT_POLL_SECONDS if raw.nil? || raw.strip.empty?

@@ -5,8 +5,9 @@
 Grok Lens is a **local, read-only** dashboard. It:
 
 - Reads session metadata and artifacts under `GROK_HOME` (default `~/.grok`)
+- Optionally reads Grok Bot roster/replica blobs under Application Support (never credential files)
 - Optionally reads project `README.md` files under session working directories
-- Never writes to `~/.grok`
+- Never writes to `~/.grok` or the Grok Bot app folder
 - Never phones home or sends your data to a remote service
 
 ## Sensitive data

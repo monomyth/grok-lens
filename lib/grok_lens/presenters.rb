@@ -3,6 +3,7 @@
 require "cgi"
 require "shellwords"
 require "time"
+require "uri"
 
 module GrokLens
   module Presenters
@@ -12,9 +13,21 @@ module GrokLens
       CGI.escape_html(text.to_s)
     end
 
+    def home_query(src: nil, sort: "last_active", running: false)
+      q = {}
+      q["src"] = src unless src.to_s.empty?
+      q["sort"] = sort unless sort.to_s.empty? || sort.to_s == "last_active"
+      q["running"] = "1" if running
+      q.empty? ? "/" : "/?#{URI.encode_www_form(q)}"
+    end
+
     # CLI to reopen a session in Grok Build TUI.
     # Prefer UUID resume with explicit cwd so it works outside the original directory.
     def resume_command(session)
+      if session.respond_to?(:bot?) && session.bot?
+        return 'open -a "Grok Bot"'
+      end
+
       cwd = session.cwd.to_s
       id = session.id.to_s
       if cwd.empty?

@@ -122,7 +122,9 @@ class CatalogTest < Minitest::Test
       git_commit: nil,
       activity_points: [],
       detail_loaded: false,
-      running_tasks: []
+      running_tasks: [],
+      source: :grok,
+      bot_section: nil
     )
     cmd = GrokLens::Presenters.resume_command(session)
     assert_equal "grok --cwd /Users/demo/code/acme-api --resume aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", cmd

@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-08-15
+
+### Added
+
+- **Grok Bot** sessions from the desktop app roster (`~/Library/Application Support/Grok Bot/sand-client-persistence`)
+- Home source chips: All / Grok Build / Grok Bot
+- Selected or awaiting-reply bot agents show as live while the Grok Bot process is running
+- `open -a "Grok Bot"` as the open command (no invented resume CLI)
+- Opt out with `GROK_LENS_GROK_BOT=0`
+
+### Notes
+
+- Bot transcripts are local replicas. Lens does not attach, prompt, or read Grok Bot credentials.
+- Token figures for bot agents are size estimates of the replica blob, labeled **est.**
+
 ## [0.3.2] — 2026-08-14
 
 ### Fixed
@@ -76,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixture-based unit and Rack tests
 - Tufte-inspired dense paper UI with SVG sparklines
 
+[0.4.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.4.0
 [0.3.2]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.2
 [0.3.1]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.1
 [0.3.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.3.0

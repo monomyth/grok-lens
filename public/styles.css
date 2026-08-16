@@ -361,6 +361,32 @@ form.inline { display: inline; margin: 0; }
   border-color: var(--ink);
   color: var(--ink);
 }
+.badge.src {
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 0.58rem;
+}
+
+.chips {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.chip {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  border: 1px solid var(--rule);
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.12rem 0.45rem;
+}
+.chip:hover { color: var(--ink); border-color: var(--ink); }
+.chip.on {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
 
 .dual {
   display: grid;

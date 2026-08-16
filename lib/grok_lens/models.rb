@@ -44,7 +44,9 @@ module GrokLens
     :git_commit,
     :activity_points,
     :detail_loaded,
-    :running_tasks
+    :running_tasks,
+    :source,       # :grok | :bot
+    :bot_section
   ) do
     def primary?
       # Top-level ledger rows: anything without a known parent (orphan subagents included)
@@ -66,6 +68,22 @@ module GrokLens
 
     def live_children_count
       Array(children).count(&:active?)
+    end
+
+    def source_key
+      (source || :grok).to_sym
+    end
+
+    def bot?
+      source_key == :bot
+    end
+
+    def grok?
+      !bot?
+    end
+
+    def source_label
+      bot? ? "Grok Bot" : "Grok"
     end
 
     def with(**changes)

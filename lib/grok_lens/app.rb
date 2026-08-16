@@ -107,7 +107,10 @@ module GrokLens
       @sort = params["sort"].to_s
       @sort = "last_active" if @sort.empty?
       @filter_running = params["running"].to_s == "1"
+      @src = params["src"].to_s
       list = @snap.primary_sessions
+      list = list.select(&:bot?) if @src == "bot"
+      list = list.select(&:grok?) if @src == "grok"
       list = list.select { |s| s.running_count.positive? } if @filter_running
       @sorted_sessions = sort_sessions(list, @sort)
       erb :home
@@ -254,7 +257,7 @@ module GrokLens
           id: s.id,
           title: s.title,
           cwd: s.cwd,
-          project: File.basename(s.cwd.to_s),
+          project: s.bot? ? (s.bot_section || "Grok Bot") : File.basename(s.cwd.to_s),
           status: s.status.to_s,
           pid: s.pid,
           model: s.current_model_id,
@@ -269,6 +272,9 @@ module GrokLens
           last_active_rel: relative_time(s.last_active_at),
           children: s.children.size,
           live_children: s.live_children_count,
+          source: s.source_key.to_s,
+          source_label: s.source_label,
+          bot_section: s.bot_section,
           running_count: s.running_count,
           running_tasks: Array(s.running_tasks).select(&:live).map { |t|
             { id: t.id, kind: t.kind.to_s, title: t.title, status: t.status, tool_name: t.tool_name }

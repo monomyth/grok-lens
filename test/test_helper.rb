@@ -8,6 +8,8 @@ require "time"
 
 ROOT = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(ROOT, "lib"))
+# Default tests should not read the developer's live Grok Bot install.
+ENV["GROK_LENS_GROK_BOT"] ||= "0"
 require "grok_lens"
 
 module FixtureHelper
@@ -145,6 +147,76 @@ module FixtureHelper
     }
     data["session_kind"] = kind if kind
     File.write(File.join(dir, "summary.json"), JSON.pretty_generate(data))
+  end
+
+  def build_bot_fixture(root)
+    FileUtils.rm_rf(root)
+    persist = File.join(root, "sand-client-persistence")
+    FileUtils.mkdir_p(persist)
+    aid = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    bid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    write_bot_blob(persist, "sand.client.slice.account.test.roster.last-roster", {
+      "schemaVersion" => 2,
+      "value" => {
+        "rows" => [
+          {
+            "id" => aid,
+            "name" => "Research Bot",
+            "description" => "Looks things up on the cloud computer.",
+            "title" => "",
+            "createdAt" => 1_700_000_000_000,
+            "updatedAt" => 1_700_000_100_000,
+            "lastActivityAt" => 1_700_000_100_000,
+            "lastEntry" => { "kind" => "text", "text" => "Summarize the brief." },
+            "awaitingUserResponse" => nil
+          },
+          {
+            "id" => bid,
+            "name" => "Inbox Bot",
+            "description" => "Drafts replies.",
+            "title" => "",
+            "createdAt" => 1_700_000_000_000,
+            "updatedAt" => 1_700_000_200_000,
+            "lastActivityAt" => 1_700_000_200_000,
+            "lastEntry" => { "kind" => "text", "text" => "Draft a short note." },
+            "awaitingUserResponse" => true
+          }
+        ]
+      }
+    })
+    write_bot_blob(persist, "sand.client.slice.account.test.selection.last-agent", {
+      "schemaVersion" => 1,
+      "value" => { "agentId" => aid }
+    })
+    write_bot_blob(persist, "sand.client.slice.account.test.sidebar.last-sections", {
+      "schemaVersion" => 1,
+      "value" => {
+        "sections" => [
+          { "id" => "section-research", "name" => "Research", "agentIds" => [aid] },
+          { "id" => "section-comms", "name" => "Comms", "agentIds" => [bid] }
+        ]
+      }
+    })
+    write_bot_blob(persist, "sand.client.slice.account.test.transcript.replicas.#{aid}", {
+      "schemaVersion" => 1,
+      "value" => {
+        "entries" => [
+          { "kind" => "message", "id" => "t0u", "role" => "user", "content" => "Please summarize the brief.", "isStreaming" => false },
+          { "kind" => "message", "id" => "t0a", "role" => "assistant", "content" => "ok", "isStreaming" => false }
+        ]
+      }
+    })
+    File.write(File.join(root, "sand-session-marker.json"), JSON.pretty_generate(
+      "version" => 1,
+      "pid" => Process.pid,
+      "appVersion" => "0.20.0"
+    ))
+    { research_id: aid, inbox_id: bid, app: root }
+  end
+
+  def write_bot_blob(dir, key, obj)
+    stem = GrokLens::Bot.encode_key(key)
+    File.write(File.join(dir, "#{stem}.blob"), JSON.generate(obj))
   end
 
   # Make a fixture PID look like a grok process that owns +session_id+.

@@ -18,7 +18,11 @@ module GrokLens
     def scan
       warnings = []
       unless Dir.exist?(@grok_home)
-        return empty_snapshot(missing: true, warnings: ["GROK_HOME not found: #{@grok_home}"])
+        warnings << "GROK_HOME not found: #{@grok_home}"
+        bot_only = Bot.new.scan(warnings)
+        return empty_snapshot(missing: true, warnings: warnings) if bot_only.empty?
+
+        return assemble_snapshot(bot_only, warnings, missing: false)
       end
 
       active_map = load_active(warnings)
@@ -52,6 +56,8 @@ module GrokLens
       end
 
       nest!(sessions)
+      bot_sessions = Bot.new.scan(warnings)
+      sessions.concat(bot_sessions)
       # Attach live running tasks for sessions that might have in-flight work:
       # live OS process, or a child / meta.json still marked running.
       ps_index = process_command_index
@@ -69,34 +75,12 @@ module GrokLens
         s.with(running_tasks: tasks)
       end
 
-      sessions_by_id = sessions.to_h { |s| [s.id, s] }
-      primaries = sessions.select(&:primary?).sort_by { |s| s.last_active_at || s.created_at || Time.at(0) }.reverse
-      projects = build_projects(primaries, warnings)
-      active = primaries.select { |s| s.active? || s.stale? || s.running_count.positive? }
-                        .sort_by { |s| s.opened_at || s.last_active_at || Time.at(0) }.reverse
-
-      total_est = sessions.sum { |s| s.est_tokens.to_i }
-      models_hist = Hash.new(0)
-      primaries.each do |s|
-        (s.models.empty? ? [s.current_model_id].compact : s.models).each { |m| models_hist[m] += 1 }
-      end
-
-      Snapshot.new(
-        scanned_at: Time.now.utc,
-        grok_home: @grok_home,
-        projects: projects,
-        sessions_by_id: sessions_by_id,
-        primary_sessions: primaries,
-        active_sessions: active,
-        warnings: warnings,
-        total_est_tokens: total_est,
-        models_hist: models_hist,
-        missing_home: false
-      )
+      assemble_snapshot(sessions, warnings, missing: false)
     end
 
     def enrich_session(session)
       return session if session.nil? || session.detail_loaded
+      return Bot.new.enrich(session) if session.bot?
 
       dir = session_dir_for(session)
       return session.with(detail_loaded: true) unless dir && Dir.exist?(dir)
@@ -143,6 +127,33 @@ module GrokLens
     end
 
     private
+
+    def assemble_snapshot(sessions, warnings, missing:)
+      sessions_by_id = sessions.to_h { |s| [s.id, s] }
+      primaries = sessions.select(&:primary?).sort_by { |s| s.last_active_at || s.created_at || Time.at(0) }.reverse
+      projects = build_projects(primaries, warnings)
+      active = primaries.select { |s| s.active? || s.stale? || s.running_count.positive? }
+                        .sort_by { |s| s.opened_at || s.last_active_at || Time.at(0) }.reverse
+
+      total_est = sessions.sum { |s| s.est_tokens.to_i }
+      models_hist = Hash.new(0)
+      primaries.each do |s|
+        (s.models.empty? ? [s.current_model_id].compact : s.models).each { |m| models_hist[m] += 1 }
+      end
+
+      Snapshot.new(
+        scanned_at: Time.now.utc,
+        grok_home: @grok_home,
+        projects: projects,
+        sessions_by_id: sessions_by_id,
+        primary_sessions: primaries,
+        active_sessions: active,
+        warnings: warnings,
+        total_est_tokens: total_est,
+        models_hist: models_hist,
+        missing_home: missing
+      )
+    end
 
     def empty_snapshot(missing:, warnings:)
       Snapshot.new(
@@ -373,7 +384,9 @@ module GrokLens
         git_commit: summary["head_commit"],
         activity_points: [],
         detail_loaded: false,
-        running_tasks: []
+        running_tasks: [],
+        source: :grok,
+        bot_section: nil
       )
     end
 
@@ -762,6 +775,8 @@ module GrokLens
     end
 
     def session_dir_for(session)
+      return nil if session.respond_to?(:bot?) && session.bot?
+
       sessions_root = File.join(@grok_home, "sessions")
       return nil unless Dir.exist?(sessions_root)
 

@@ -13,8 +13,10 @@
   <div class="row">
     <span class="dot <%= @session.status %>"></span>
     <span class="status-text"><%= status_label(@session.status) %></span>
+    <span class="badge src"><%= h(@session.source_label) %></span>
     <% if @session.session_kind %><span class="badge"><%= h(@session.session_kind) %></span><% end %>
-    <% if @session.agent_name %><span class="badge"><%= h(@session.agent_name) %></span><% end %>
+    <% if @session.agent_name && @session.agent_name != @session.title %><span class="badge"><%= h(@session.agent_name) %></span><% end %>
+    <% if @session.bot_section %><span class="badge"><%= h(@session.bot_section) %></span><% end %>
   </div>
   <h1><%= h(@session.title) %></h1>
   <p class="mono path"><%= h(short_path(@session.cwd)) %></p>
@@ -50,8 +52,11 @@
     </div>
     <div class="copy-row">
       <code class="copy-value mono" id="resume-cmd"><%= h(resume_command(@session)) %></code>
-      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>">Copy resume</button>
+      <button type="button" class="btn small" data-copy-text="<%= h(resume_command(@session)) %>"><%= @session.bot? ? "Copy open" : "Copy resume" %></button>
     </div>
+    <% if @session.bot? %>
+      <p class="muted" style="margin-top:.35rem">Local replica only. Work runs on the Grok Bot computer — Lens does not attach or send prompts.</p>
+    <% end %>
   </div>
 </header>
 

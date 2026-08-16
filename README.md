@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruby](https://img.shields.io/badge/Ruby-%3E%3D%204.0-red.svg)](https://www.ruby-lang.org/)
 
-Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions and projects under `~/.grok`.
+Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions under `~/.grok` and [Grok Bot](https://x.ai/bot) agents on this Mac.
 
 Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
@@ -14,6 +14,7 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
 - **Projects** by working directory — path, short description, model mix, est. tokens
 - **Sessions** — **live** / **stale** / **idle**, models, turns, est. tokens, context window
+- **Grok Bot** — named agents from the desktop app roster, filterable on Home
 - **Running tasks** — in-flight bg shells / tools / live subagents (with process/port liveness checks)
 - **Nested subagents** — `+N sub · K live`
 - **Search** — FTS over Grok’s `session_search.sqlite`
@@ -28,7 +29,7 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
 | Label | Meaning |
 |--------|---------|
-| **live** | A Grok process for this session is running (registry and/or `grok --resume …`) |
+| **live** | A Grok process for this session is running, or (Grok Bot) the app is open and this agent is selected / awaiting a reply |
 | **stale** | Listed open but pid is dead |
 | **idle** | No live process |
 | **N running** | Live in-flight work units (bg shell, tool, subagent) after liveness checks |
@@ -67,6 +68,8 @@ Open **http://127.0.0.1:9292**
 | `GROK_LENS_POLL_SECONDS` | `300` | Default auto-refresh (UI can override; `0` = off) |
 | `GROK_LENS_USD_PER_M_TOKENS` | unset | **Optional** USD per 1M tokens for est. cost — leave unset to hide cost |
 | `GROK_LENS_CONFIG` | `~/.grok-lens.yml` | Optional YAML (`usd_per_m_tokens`) — see `config.example.yml` |
+| `GROK_LENS_GROK_BOT` | on | Set `0` to hide Grok Bot agents |
+| `GROK_LENS_GROK_BOT_APP` | `~/Library/Application Support/Grok Bot` | Desktop persistence root |
 
 ```bash
 GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
@@ -90,6 +93,8 @@ Dual-home dashboard (synthetic demo data — not real session history):
 | `active_sessions.json` + process table | Live / stale sessions |
 | `sessions/session_search.sqlite` | FTS search |
 | Project `README.md` | Optional project description |
+| `~/Library/Application Support/Grok Bot/sand-client-persistence` | Grok Bot roster + transcript replicas |
+| `…/sand-session-marker.json` | Grok Bot app liveness |
 
 ## Development
 

@@ -1,3 +1,6 @@
 # Copy to ~/.grok-lens.yml (or set GROK_LENS_CONFIG)
 # Optional estimated cost: USD per 1 million tokens (blended input/output).
 usd_per_m_tokens: 5.0
+
+# Grok Bot is on by default when the desktop app's persistence folder exists.
+# Disable with the environment variable GROK_LENS_GROK_BOT=0.
