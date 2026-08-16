@@ -22,47 +22,30 @@ class BotTest < Minitest::Test
     assert_equal key, GrokLens::Bot.decode_key(stem)
   end
 
-  def test_scan_reads_roster
+  def test_scan_lists_agents_not_sessions
     warnings = []
     rows = @bot.scan(warnings)
     assert_empty warnings
     assert_equal 2, rows.size
-    research = rows.find { |s| s.id == @ids[:research_id] }
-    inbox = rows.find { |s| s.id == @ids[:inbox_id] }
-    assert research.bot?
-    assert_equal "Research Bot", research.title
-    assert_equal "Research", research.bot_section
-    assert_equal "grok-bot://section-research", research.cwd
-    assert_equal :active, research.status, "selected agent is live while Grok Bot pid is this process"
-    assert_equal :active, inbox.status, "awaiting user response is live"
-    assert research.est_tokens.positive?
-    assert_match(/Summarize the brief/i, research.first_user_prompt.to_s)
+    assert rows.all? { |a| a.is_a?(GrokLens::BotAgent) }
+    research = rows.find { |a| a.id == @ids[:research_id] }
+    inbox = rows.find { |a| a.id == @ids[:inbox_id] }
+    assert_equal "Research Bot", research.name
+    assert_equal "Research", research.section
+    assert_equal :idle, research.status
+    assert_equal :working, inbox.status
+    assert_match(/two-line reply/i, inbox.activity.to_s)
+    refute research.activity
   end
 
-  def test_enrich_reads_opening_message
-    session = @bot.scan([]).find { |s| s.id == @ids[:research_id] }
-    rich = @bot.enrich(session)
-    assert rich.detail_loaded
-    assert_match(/summarize the brief/i, rich.first_user_prompt.to_s)
-    assert rich.num_messages >= 2
-  end
-
-  def test_store_merges_bot_into_snapshot
+  def test_store_does_not_merge_agents_into_sessions
     home = File.join(ROOT, "tmp", "fixture-home-with-bot")
     FixtureHelper.build_fixture_home(home)
     store = GrokLens::Store.new(grok_home: home)
     FixtureHelper.stub_registry_pid(store, Process.pid, "11111111-1111-1111-1111-111111111111")
     snap = store.scan
-    bot = snap.session(@ids[:research_id])
-    assert bot, "expected Grok Bot agent in snapshot"
-    assert bot.bot?
-    assert snap.primary_sessions.any?(&:grok?)
-    assert snap.projects.any? { |p| p.path.start_with?("grok-bot://") }
-  end
-
-  def test_resume_opens_app
-    session = @bot.scan([]).first
-    assert_equal 'open -a "Grok Bot"', GrokLens::Presenters.resume_command(session)
+    refute snap.session(@ids[:research_id])
+    refute snap.projects.any? { |p| p.path.to_s.start_with?("grok-bot://") }
   end
 
   def test_disabled_skips_scan

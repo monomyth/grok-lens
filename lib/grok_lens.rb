@@ -15,5 +15,5 @@ require_relative "grok_lens/bot"
 require_relative "grok_lens/app"
 
 module GrokLens
-  VERSION = "0.4.0"
+  VERSION = "0.4.1"
 end

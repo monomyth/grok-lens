@@ -179,7 +179,7 @@ module FixtureHelper
             "updatedAt" => 1_700_000_200_000,
             "lastActivityAt" => 1_700_000_200_000,
             "lastEntry" => { "kind" => "text", "text" => "Draft a short note." },
-            "awaitingUserResponse" => true
+            "awaitingUserResponse" => false
           }
         ]
       }
@@ -203,6 +203,15 @@ module FixtureHelper
         "entries" => [
           { "kind" => "message", "id" => "t0u", "role" => "user", "content" => "Please summarize the brief.", "isStreaming" => false },
           { "kind" => "message", "id" => "t0a", "role" => "assistant", "content" => "ok", "isStreaming" => false }
+        ]
+      }
+    })
+    write_bot_blob(persist, "sand.client.slice.account.test.transcript.replicas.#{bid}", {
+      "schemaVersion" => 1,
+      "value" => {
+        "entries" => [
+          { "kind" => "message", "id" => "t1u", "role" => "user", "content" => "Draft a short note.", "isStreaming" => false },
+          { "kind" => "message", "id" => "t1a", "role" => "assistant", "content" => "Drafting a two-line reply to the thread.", "isStreaming" => true }
         ]
       }
     })

@@ -18,11 +18,7 @@ module GrokLens
     def scan
       warnings = []
       unless Dir.exist?(@grok_home)
-        warnings << "GROK_HOME not found: #{@grok_home}"
-        bot_only = Bot.new.scan(warnings)
-        return empty_snapshot(missing: true, warnings: warnings) if bot_only.empty?
-
-        return assemble_snapshot(bot_only, warnings, missing: false)
+        return empty_snapshot(missing: true, warnings: ["GROK_HOME not found: #{@grok_home}"])
       end
 
       active_map = load_active(warnings)
@@ -56,8 +52,6 @@ module GrokLens
       end
 
       nest!(sessions)
-      bot_sessions = Bot.new.scan(warnings)
-      sessions.concat(bot_sessions)
       # Attach live running tasks for sessions that might have in-flight work:
       # live OS process, or a child / meta.json still marked running.
       ps_index = process_command_index
@@ -80,7 +74,6 @@ module GrokLens
 
     def enrich_session(session)
       return session if session.nil? || session.detail_loaded
-      return Bot.new.enrich(session) if session.bot?
 
       dir = session_dir_for(session)
       return session.with(detail_loaded: true) unless dir && Dir.exist?(dir)
@@ -775,8 +768,6 @@ module GrokLens
     end
 
     def session_dir_for(session)
-      return nil if session.respond_to?(:bot?) && session.bot?
-
       sessions_root = File.join(@grok_home, "sessions")
       return nil unless Dir.exist?(sessions_root)
 

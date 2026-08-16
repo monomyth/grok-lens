@@ -1,0 +1,56 @@
+<% @title = "#{@agent.name} · Grok Bot" %>
+
+<nav class="crumb">
+  <a href="/">Home</a> · <a href="/bot">Grok Bot</a> · agent
+</nav>
+
+<header class="detail-header">
+  <div class="row">
+    <span class="dot <%= @agent.working? ? "active" : "idle" %>"></span>
+    <span class="status-text"><%= @agent.working? ? "working" : "idle" %></span>
+    <span class="badge src">Grok Bot</span>
+    <span class="badge"><%= h(@agent.section) %></span>
+    <% if @agent.awaiting %><span class="badge">waiting</span><% end %>
+    <% if @agent.selected %><span class="badge">open in app</span><% end %>
+  </div>
+  <h1><%= h(@agent.name) %></h1>
+  <% if @agent.description && !@agent.description.empty? %>
+    <p class="desc"><%= h(@agent.description) %></p>
+  <% end %>
+
+  <div class="meta-grid">
+    <div><span class="label">Status</span><span><%= @agent.working? ? "working" : "idle" %></span></div>
+    <div><span class="label">Section</span><span><%= h(@agent.section) %></span></div>
+    <div><span class="label">Last active</span><span class="num"><%= @agent.last_active_at&.strftime("%Y-%m-%d %H:%M UTC") || "—" %></span></div>
+    <div><span class="label">Created</span><span class="num"><%= @agent.created_at&.strftime("%Y-%m-%d %H:%M UTC") || "—" %></span></div>
+  </div>
+
+  <div class="copy-panel compact">
+    <div class="copy-row">
+      <code class="copy-value" id="agent-id"><%= h(@agent.id) %></code>
+      <button type="button" class="btn small" data-copy-text="<%= h(@agent.id) %>">Copy id</button>
+    </div>
+    <div class="copy-row">
+      <code class="copy-value mono">open -a "Grok Bot"</code>
+      <button type="button" class="btn small" data-copy-text='open -a "Grok Bot"'>Copy open</button>
+    </div>
+  </div>
+</header>
+
+<% if @agent.working? %>
+<section class="block">
+  <h2 class="section-title">Doing now</h2>
+  <% if @agent.activity %>
+    <p class="desc"><%= h(@agent.activity) %></p>
+  <% else %>
+    <p class="muted">Replica is streaming, but there is no text to show yet.</p>
+  <% end %>
+</section>
+<% elsif @agent.last_entry %>
+<section class="block">
+  <h2 class="section-title">Last line</h2>
+  <p class="desc"><%= h(@agent.last_entry) %></p>
+</section>
+<% end %>
+
+<p class="muted">Local replica only. Work runs on the Grok Bot computer.</p>

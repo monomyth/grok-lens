@@ -91,6 +91,35 @@ module GrokLens
     end
   end
 
+  # Grok Bot desktop agent (not a Grok Build session).
+  BotAgent = Data.define(
+    :id,
+    :name,
+    :description,
+    :section_id,
+    :section,
+    :status,          # :working | :idle
+    :awaiting,
+    :selected,
+    :activity,        # what it is doing, when working
+    :last_entry,
+    :created_at,
+    :last_active_at,
+    :app_alive
+  ) do
+    def working?
+      status == :working
+    end
+
+    def idle?
+      status == :idle
+    end
+
+    def with(**changes)
+      self.class.new(**to_h.merge(changes))
+    end
+  end
+
   Project = Data.define(
     :id,
     :path,

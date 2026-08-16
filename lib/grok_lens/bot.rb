@@ -5,9 +5,8 @@ require "time"
 
 module GrokLens
   # Read-only adapter for the Grok Bot desktop app.
-  # Sessions are agents in `roster.last-roster`; chat replicas live beside it
-  # as `transcript.replicas.<uuid>` blobs. Never writes. Never reads
-  # local-exec-daemon-connection.json or other credential files.
+  # Roster rows are *agents* (not Grok Build sessions). One local transcript
+  # replica per agent today. Never writes. Never reads credential files.
   class Bot
     TABLE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
@@ -49,124 +48,57 @@ module GrokLens
 
       selected = selected_agent_id(blobs[:selection])
       sections = section_map(blobs[:sidebar])
-      app_pid, app_alive = app_liveness
-      now = Time.now.utc
+      section_order = sections[:order] || []
+      _app_pid, app_alive = app_liveness
 
-      rows.filter_map do |row|
+      agents = rows.filter_map do |row|
         id = row["id"].to_s
         next if id.empty?
 
         replica = blobs[:replicas][id]
-        replica_bytes = replica && File.file?(replica) ? File.size(replica) : 0
-        section_id, section_name = sections[id] || ["unassigned", "Grok Bot"]
-        title = row["name"].to_s.strip
-        title = "Bot #{id[0, 8]}" if title.empty?
+        sid, sname = (sections[:by_agent] || {})[id] || ["unassigned", "Unassigned"]
+        name = row["name"].to_s.strip
+        name = "Agent #{id[0, 8]}" if name.empty?
         desc = row["description"].to_s.strip
         last_text = row.dig("lastEntry", "text").to_s.strip
-        created = ms_time(row["createdAt"])
-        updated = ms_time(row["lastActivityAt"] || row["updatedAt"])
-        awaiting = !row["awaitingUserResponse"].nil? && row["awaitingUserResponse"] != false
-        status = bot_status(app_alive, selected, id, awaiting)
-        pid = (status == :active) ? app_pid : nil
+        awaiting = truthy?(row["awaitingUserResponse"])
+        work = replica_work(replica, app_alive)
+        status = work[:working] ? :working : :idle
+        activity = status == :working ? work[:activity] : nil
 
-        Session.new(
+        BotAgent.new(
           id: id,
-          cwd: "grok-bot://#{section_id}",
-          title: title,
-          summary_text: desc,
+          name: name,
+          description: desc,
+          section_id: sid,
+          section: sname,
           status: status,
-          pid: pid,
-          models: [],
-          current_model_id: nil,
-          created_at: created,
-          last_active_at: updated,
-          opened_at: status == :active ? now : nil,
-          num_messages: 0,
-          num_chat_messages: 0,
-          num_turns: 0,
-          tool_counts: {},
-          est_tokens: Estimate.size_based(chat_history_bytes: replica_bytes, events_bytes: 0),
-          context_tokens: nil,
-          context_window: nil,
-          est_source: replica_bytes.positive? ? "size" : nil,
-          disk_bytes: replica_bytes,
-          agent_name: title,
-          session_kind: "bot",
-          parent_id: nil,
-          children: [],
-          first_user_prompt: last_text.empty? ? nil : clip(last_text, 500),
-          git_root: nil,
-          git_branch: nil,
-          git_commit: nil,
-          activity_points: [],
-          detail_loaded: false,
-          running_tasks: [],
-          source: :bot,
-          bot_section: section_name
+          awaiting: awaiting,
+          selected: selected == id,
+          activity: activity,
+          last_entry: last_text.empty? ? nil : clip(last_text, 280),
+          created_at: ms_time(row["createdAt"]),
+          last_active_at: ms_time(row["lastActivityAt"] || row["updatedAt"]),
+          app_alive: app_alive
         )
       rescue StandardError => e
         warnings << "Grok Bot agent #{row.is_a?(Hash) ? row["id"] : "?"}: #{e.class}: #{e.message}"
         nil
       end
+
+      rank = {}
+      section_order.each_with_index { |sid, i| rank[sid] = i }
+      agents.sort_by do |a|
+        [rank.fetch(a.section_id, 999), a.working? ? 0 : 1, -(a.last_active_at&.to_i || 0), a.name.to_s.downcase]
+      end
     end
 
-    def enrich(session)
-      return session if session.nil? || session.detail_loaded
-
-      replica = replica_path_for(session.id)
-      return session.with(detail_loaded: true) unless replica && File.file?(replica)
-      return session.with(detail_loaded: true) if File.size(replica) > 2_000_000
-
-      data = read_json(replica)
-      entries = data.dig("value", "entries")
-      entries = [] unless entries.is_a?(Array)
-
-      first = nil
-      counts = Hash.new(0)
-      models = []
-      streaming = false
-      entries.each do |entry|
-        next unless entry.is_a?(Hash)
-
-        kind = entry["kind"].to_s
-        counts[kind] += 1
-        models << entry["model"] if entry["model"]
-        models << entry["modelId"] if entry["modelId"]
-        streaming ||= entry["isStreaming"] == true
-        next if first
-        next unless kind == "message" && entry["role"].to_s == "user"
-
-        text = entry["content"].to_s
-        if text =~ %r{<user_query>\s*([\s\S]*?)\s*</user_query>}i
-          text = Regexp.last_match(1)
-        end
-        first = clip(text, 500) unless text.to_s.strip.empty?
+    def grouped(agents)
+      groups = []
+      agents.group_by(&:section_id).each do |sid, list|
+        groups << { id: sid, name: list.first.section, agents: list }
       end
-
-      msgs = counts["message"].to_i
-      tasks = []
-      if streaming
-        tasks << RunningTask.new(
-          id: "#{session.id}:stream",
-          kind: :tool,
-          title: "streaming",
-          status: "running",
-          tool_name: nil,
-          live: true
-        )
-      end
-
-      session.with(
-        first_user_prompt: first || session.first_user_prompt,
-        num_messages: msgs,
-        num_chat_messages: msgs,
-        models: models.compact.uniq,
-        current_model_id: session.current_model_id || models.compact.last,
-        running_tasks: tasks,
-        detail_loaded: true
-      )
-    rescue StandardError
-      session.with(detail_loaded: true)
+      groups
     end
 
     def self.encode_key(str)
@@ -230,18 +162,64 @@ module GrokLens
     end
 
     def section_map(path)
-      map = {}
-      return map unless path && File.file?(path)
+      by_agent = {}
+      order = []
+      return { by_agent: by_agent, order: order } unless path && File.file?(path)
 
       Array(read_json(path).dig("value", "sections")).each do |sec|
         next unless sec.is_a?(Hash)
 
         sid = sec["id"].to_s
+        next if sid.empty? || sid == "__agents__"
+
         sname = sec["name"].to_s
         sname = sid if sname.empty?
-        Array(sec["agentIds"]).each { |aid| map[aid.to_s] = [sid, sname] }
+        order << sid unless order.include?(sid)
+        Array(sec["agentIds"]).each { |aid| by_agent[aid.to_s] = [sid, sname] }
       end
-      map
+      { by_agent: by_agent, order: order }
+    end
+
+    def replica_work(path, app_alive)
+      empty = { working: false, activity: nil }
+      return empty unless app_alive
+      return empty unless path && File.file?(path)
+      return empty if File.size(path) > 2_000_000
+
+      entries = Array(read_json(path).dig("value", "entries"))
+      streaming = false
+      last_stream = nil
+      last_assistant = nil
+      entries.each do |entry|
+        next unless entry.is_a?(Hash)
+
+        text = entry_text(entry)
+        if entry["isStreaming"] == true
+          streaming = true
+          last_stream = text unless text.empty?
+        end
+        if entry["kind"].to_s == "message" && entry["role"].to_s == "assistant"
+          last_assistant = text unless text.empty?
+        end
+      end
+      activity = last_stream || last_assistant
+      {
+        working: streaming,
+        activity: activity ? clip(activity, 220) : nil
+      }
+    rescue StandardError
+      empty
+    end
+
+    def entry_text(entry)
+      raw = entry["content"]
+      raw = entry.dig("message", "content") if raw.to_s.empty?
+      raw = entry["text"] if raw.to_s.empty?
+      raw.to_s.gsub(/\s+/, " ").strip
+    end
+
+    def truthy?(value)
+      value == true || value.to_s == "true"
     end
 
     def app_liveness
@@ -255,14 +233,6 @@ module GrokLens
       [pid, pid_alive?(pid)]
     rescue StandardError
       [nil, false]
-    end
-
-    def bot_status(app_alive, selected, id, awaiting)
-      return :idle unless app_alive
-      return :active if awaiting
-      return :active if selected && selected == id
-
-      :idle
     end
 
     def pid_alive?(pid)

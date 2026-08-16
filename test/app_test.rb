@@ -18,6 +18,7 @@ class AppTest < Minitest::Test
     GrokLens::App.set :catalog, GrokLens::Catalog.new(grok_home: @home)
     GrokLens::App.set :snapshot, nil
     GrokLens::App.set :last_scan_ms, nil
+    GrokLens::App.set :bot_agents, nil
   end
 
   def project_slug
@@ -160,6 +161,26 @@ class AppTest < Minitest::Test
     assert last_response.ok?
     assert_match(/Running only/i, last_response.body)
     assert_match(/Grok Bot/, last_response.body)
+  end
+
+  def test_bot_roster_route
+    root = File.join(ROOT, "tmp", "fixture-grok-bot-app")
+    ids = FixtureHelper.build_bot_fixture(root)
+    ENV["GROK_LENS_GROK_BOT"] = "1"
+    ENV["GROK_LENS_GROK_BOT_APP"] = root
+    GrokLens::App.set :bot_agents, nil
+    get "/bot"
+    assert last_response.ok?, last_response.body[0, 400]
+    assert_match(/Inbox Bot/, last_response.body)
+    assert_match(/working/, last_response.body)
+    get "/bot/#{ids[:inbox_id]}"
+    assert last_response.ok?
+    assert_match(/Doing now/, last_response.body)
+    assert_match(/two-line reply/i, last_response.body)
+  ensure
+    ENV["GROK_LENS_GROK_BOT"] = "0"
+    ENV.delete("GROK_LENS_GROK_BOT_APP")
+    GrokLens::App.set :bot_agents, nil
   end
 
 

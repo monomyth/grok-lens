@@ -1,0 +1,66 @@
+<% @title = "Grok Bot · Grok Lens" %>
+
+<header class="detail-header">
+  <h1>Grok Bot agents</h1>
+  <p class="desc">
+    Named teammates from the Grok Bot app on this Mac — not Grok Build sessions.
+    Lens is read-only: it does not attach, prompt, or approve.
+  </p>
+  <div class="meta-grid">
+    <div><span class="label">Agents</span><span class="num"><%= @bot_agents.size %></span></div>
+    <div><span class="label">Working</span><span class="num" id="bot-working-count"><%= @bot_agents.count(&:working?) %></span></div>
+    <div><span class="label">Idle</span><span class="num" id="bot-idle-count"><%= @bot_agents.count(&:idle?) %></span></div>
+    <div><span class="label">App</span><span><%= @bot_agents.any?(&:app_alive) ? "open" : "not running" %></span></div>
+  </div>
+</header>
+
+<% if @bot_agents.empty? %>
+  <section class="empty">
+    <h1>No Grok Bot roster</h1>
+    <p>Looked under <code><%= h(short_path(GrokLens::Config.grok_bot_app_support)) %></code>. Open Grok Bot once, or set <code>GROK_LENS_GROK_BOT_APP</code>. Hide this page with <code>GROK_LENS_GROK_BOT=0</code>.</p>
+  </section>
+<% else %>
+  <% @bot_groups.each do |group| %>
+    <section class="block bot-section" data-section="<%= h(group[:id]) %>">
+      <h2 class="section-title"><%= h(group[:name]) %> <span class="muted num"><%= group[:agents].count(&:working?) %> working · <%= group[:agents].size %></span></h2>
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Agent</th>
+            <th>Doing</th>
+            <th class="r">Age</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% group[:agents].each do |a| %>
+            <tr data-filter="<%= h("#{a.name} #{a.section} #{a.description} #{a.activity}") %>">
+              <td>
+                <span class="dot <%= a.working? ? "active" : "idle" %>"></span>
+                <%= a.working? ? "working" : "idle" %>
+                <% if a.awaiting && a.idle? %><span class="badge">waiting</span><% end %>
+                <% if a.selected %><span class="badge">open</span><% end %>
+              </td>
+              <td>
+                <a href="/bot/<%= h(a.id) %>"><%= h(a.name) %></a>
+                <% if a.description && !a.description.empty? %>
+                  <div class="subline muted"><%= h(a.description.length > 140 ? a.description[0, 139] + "…" : a.description) %></div>
+                <% end %>
+              </td>
+              <td class="desc">
+                <% if a.working? && a.activity %>
+                  <%= h(a.activity) %>
+                <% elsif a.working? %>
+                  <span class="muted">Working — no text in the local replica yet.</span>
+                <% else %>
+                  <span class="muted">—</span>
+                <% end %>
+              </td>
+              <td class="r num muted"><%= relative_time(a.last_active_at) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+  <% end %>
+<% end %>

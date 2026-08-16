@@ -256,6 +256,12 @@
     setText("stat-tokens", data.total_est_tokens_label);
     setText("stat-header-tokens", data.total_est_tokens_label);
     if (data.total_cost_label) setText("stat-cost", data.total_cost_label);
+    if (data.bot) {
+      setText("bot-home-working", data.bot.working);
+      setText("bot-home-idle", data.bot.idle);
+      setText("bot-working-count", data.bot.working);
+      setText("bot-idle-count", data.bot.idle);
+    }
 
     var activeBlock = document.getElementById("active-block");
     var activeBody = document.getElementById("active-tbody");

@@ -23,6 +23,7 @@ module GrokLens
       set :snapshot, nil
       set :snapshot_mutex, Mutex.new
       set :last_scan_ms, nil
+      set :bot_agents, nil
     end
 
     helpers Presenters
@@ -39,8 +40,25 @@ module GrokLens
         # Scan off the mutex so requests can still serve the previous snapshot.
         settings.store.instance_variable_set(:@process_command_index, nil)
         snap = timed_scan
-        settings.snapshot_mutex.synchronize { settings.snapshot = snap }
+        agents = load_bot_agents
+        settings.snapshot_mutex.synchronize do
+          settings.snapshot = snap
+          settings.bot_agents = agents
+        end
         snap
+      end
+
+      def bot_agents
+        cached = settings.snapshot_mutex.synchronize { settings.bot_agents }
+        return cached if cached
+
+        refresh_snapshot!
+        settings.snapshot_mutex.synchronize { settings.bot_agents } || []
+      end
+
+      def load_bot_agents
+        warnings = []
+        Bot.new.scan(warnings)
       end
 
       def timed_scan
@@ -107,13 +125,26 @@ module GrokLens
       @sort = params["sort"].to_s
       @sort = "last_active" if @sort.empty?
       @filter_running = params["running"].to_s == "1"
-      @src = params["src"].to_s
       list = @snap.primary_sessions
-      list = list.select(&:bot?) if @src == "bot"
-      list = list.select(&:grok?) if @src == "grok"
       list = list.select { |s| s.running_count.positive? } if @filter_running
       @sorted_sessions = sort_sessions(list, @sort)
+      @bot_agents = bot_agents
       erb :home
+    end
+
+    get "/bot" do
+      @snap = snapshot
+      @bot_agents = bot_agents
+      @bot_groups = Bot.new.grouped(@bot_agents)
+      erb :bot
+    end
+
+    get "/bot/:id" do
+      @snap = snapshot
+      @bot_agents = bot_agents
+      @agent = @bot_agents.find { |a| a.id == params[:id] }
+      halt 404, erb(:not_found) unless @agent
+      erb :bot_agent
     end
 
     get "/search" do
@@ -201,6 +232,7 @@ module GrokLens
         models_hist: snap.models_hist,
         active_sessions: snap.active_sessions.map { |s| session_json(s) },
         recent_sessions: snap.primary_sessions.map { |s| session_json(s) },
+        bot: bot_summary_json(force ? settings.bot_agents : bot_agents),
         projects_list: snap.projects.map { |p|
           {
             id: p.id,
@@ -257,7 +289,7 @@ module GrokLens
           id: s.id,
           title: s.title,
           cwd: s.cwd,
-          project: s.bot? ? (s.bot_section || "Grok Bot") : File.basename(s.cwd.to_s),
+          project: File.basename(s.cwd.to_s),
           status: s.status.to_s,
           pid: s.pid,
           model: s.current_model_id,
@@ -281,6 +313,29 @@ module GrokLens
           },
           resume_command: resume_command(s),
           continue_command: continue_command(s)
+        }
+      end
+
+      def bot_summary_json(agents)
+        list = Array(agents)
+        {
+          available: Config.grok_bot_enabled?,
+          total: list.size,
+          working: list.count(&:working?),
+          idle: list.count(&:idle?),
+          agents: list.map { |a|
+            {
+              id: a.id,
+              name: a.name,
+              section: a.section,
+              status: a.status.to_s,
+              awaiting: a.awaiting,
+              selected: a.selected,
+              activity: a.activity,
+              last_entry: a.last_entry,
+              last_active_rel: relative_time(a.last_active_at)
+            }
+          }
         }
       end
     end

@@ -14,7 +14,7 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
 - **Projects** by working directory — path, short description, model mix, est. tokens
 - **Sessions** — **live** / **stale** / **idle**, models, turns, est. tokens, context window
-- **Grok Bot** — named agents from the desktop app roster, filterable on Home
+- **Grok Bot** — separate agent roster (`/bot`): section, working/idle, activity skim when working
 - **Running tasks** — in-flight bg shells / tools / live subagents (with process/port liveness checks)
 - **Nested subagents** — `+N sub · K live`
 - **Search** — FTS over Grok’s `session_search.sqlite`
@@ -29,7 +29,8 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
 | Label | Meaning |
 |--------|---------|
-| **live** | A Grok process for this session is running, or (Grok Bot) the app is open and this agent is selected / awaiting a reply |
+| **live** | A Grok process for this session is running (registry and/or `grok --resume …`) |
+| **working** | Grok Bot agent whose local replica is still streaming (app must be open) |
 | **stale** | Listed open but pid is dead |
 | **idle** | No live process |
 | **N running** | Live in-flight work units (bg shell, tool, subagent) after liveness checks |

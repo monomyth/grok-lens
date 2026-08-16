@@ -21,13 +21,34 @@
   <div class="stat">
     <div class="label">Primary sessions</div>
     <div class="value num" id="stat-sessions"><%= @snap.primary_sessions.size %></div>
-    <div class="sub"><%= @snap.primary_sessions.count(&:grok?) %> grok · <%= @snap.primary_sessions.count(&:bot?) %> bot · <%= @snap.sessions_by_id.size %> incl. nested</div>
+    <div class="sub"><%= @snap.sessions_by_id.size %> incl. nested</div>
   </div>
   <div class="stat">
     <div class="label">Models</div>
     <div class="model-list" id="stat-models"><%= model_bars(@snap.models_hist) %></div>
   </div>
 </section>
+
+<% if GrokLens::Config.grok_bot_enabled? %>
+<section class="block" id="bot-home-block">
+  <h2 class="section-title"><a href="/bot">Grok Bot</a></h2>
+  <p class="desc" id="bot-home-line">
+    <% working = Array(@bot_agents).count(&:working?) %>
+    <% idle = Array(@bot_agents).count(&:idle?) %>
+    <% if Array(@bot_agents).empty? %>
+      No roster on this Mac. <a href="/bot">Details</a>
+    <% else %>
+      <span class="num" id="bot-home-working"><%= working %></span> working
+      · <span class="num" id="bot-home-idle"><%= idle %></span> idle
+      · <%= Array(@bot_agents).size %> agents
+      <a href="/bot">Open roster</a>
+    <% end %>
+  </p>
+  <% Array(@bot_agents).select(&:working?).first(3).each do |a| %>
+    <p class="desc bot-doing"><strong><%= h(a.name) %></strong> · <%= h(a.activity || "working") %></p>
+  <% end %>
+</section>
+<% end %>
 
 <section class="block" id="active-block"<%= @snap.active_sessions.any? ? "" : " hidden" %>>
   <h2 class="section-title">Active now</h2>
@@ -50,7 +71,6 @@
           <td class="mono"><%= h(File.basename(s.cwd.to_s)) %></td>
           <td>
             <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
-            <span class="badge src"><%= h(s.source_label) %></span>
             <% if s.children.any? %>
               <span class="badge">+<%= s.children.size %> sub<% if s.live_children_count.positive? %> · <%= s.live_children_count %> live<% end %></span>
             <% end %>
@@ -96,12 +116,6 @@
       <h2 class="section-title">Sessions</h2>
       <div class="toolbar">
         <form method="get" action="/" class="inline toolbar-form">
-          <% unless @src.to_s.empty? %><input type="hidden" name="src" value="<%= h(@src) %>"><% end %>
-          <div class="chips" role="navigation" aria-label="Source">
-            <a class="chip<%= @src.to_s.empty? ? " on" : "" %>" href="<%= home_query(sort: @sort, running: @filter_running) %>">All</a>
-            <a class="chip<%= @src == "grok" ? " on" : "" %>" href="<%= home_query(src: "grok", sort: @sort, running: @filter_running) %>">Grok Build</a>
-            <a class="chip<%= @src == "bot" ? " on" : "" %>" href="<%= home_query(src: "bot", sort: @sort, running: @filter_running) %>">Grok Bot</a>
-          </div>
           <select name="sort" aria-label="Sort sessions" onchange="this.form.submit()">
             <option value="last_active" <%= @sort == "last_active" ? "selected" : "" %>>Last active</option>
             <option value="running" <%= @sort == "running" ? "selected" : "" %>>Running tasks</option>
@@ -127,16 +141,15 @@
       </thead>
       <tbody id="recent-tbody">
         <% @sorted_sessions.each do |s| %>
-          <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id} #{s.source_label} #{s.bot_section}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>" data-source="<%= h(s.source_key) %>">
+          <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>">
             <td class="age muted num"><%= relative_time(s.last_active_at) %></td>
             <td>
               <a href="/sessions/<%= h(s.id) %>"><%= h(s.title) %></a>
-              <span class="badge src"><%= h(s.source_label) %></span>
               <% if s.children.any? %>
                 <span class="badge">+<%= s.children.size %> sub<% if s.live_children_count.positive? %> · <%= s.live_children_count %> live<% end %></span>
               <% end %>
               <% if s.running_count.positive? %><span class="badge live-tasks"><%= s.running_count %> running</span><% end %>
-              <div class="subline muted"><%= h(s.bot? ? (s.bot_section || "Grok Bot") : File.basename(s.cwd.to_s)) %> · <%= h(s.current_model_id || (s.bot? ? "bot" : nil)) %> · <%= s.num_turns %> turns<% if s.context_tokens %> · ctx <%= est(s.context_tokens) %><% end %></div>
+              <div class="subline muted"><%= h(File.basename(s.cwd.to_s)) %> · <%= h(s.current_model_id) %> · <%= s.num_turns %> turns<% if s.context_tokens %> · ctx <%= est(s.context_tokens) %><% end %></div>
               <div class="row actions">
                 <button type="button" class="btn small" data-copy-text="<%= h(s.id) %>">Id</button>
                 <button type="button" class="btn small" data-copy-text="<%= h(resume_command(s)) %>">Resume</button>
