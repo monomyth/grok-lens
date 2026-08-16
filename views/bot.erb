@@ -14,13 +14,7 @@
   </div>
 </header>
 
-<% if @bot_agents.empty? %>
-  <section class="empty">
-    <h1>No Grok Bot roster</h1>
-    <p>Looked under <code><%= h(short_path(GrokLens::Config.grok_bot_app_support)) %></code>. Open Grok Bot once, or set <code>GROK_LENS_GROK_BOT_APP</code>. Hide this page with <code>GROK_LENS_GROK_BOT=0</code>.</p>
-  </section>
-<% else %>
-  <% @bot_groups.each do |group| %>
+<% @bot_groups.each do |group| %>
     <section class="block bot-section" data-section="<%= h(group[:id]) %>">
       <h2 class="section-title"><%= h(group[:name]) %> <span class="muted num"><%= group[:agents].count(&:working?) %> working · <%= group[:agents].size %></span></h2>
       <table class="ledger">
@@ -63,4 +57,3 @@
       </table>
     </section>
   <% end %>
-<% end %>

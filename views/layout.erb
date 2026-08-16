@@ -34,7 +34,7 @@
           <a href="/search" class="<%= nav_active("/search") %>">Search</a>
           <a href="/compare" class="<%= nav_active("/compare") %>">Compare</a>
           <a href="/glossary" class="<%= nav_active("/glossary") %>">Glossary</a>
-          <a href="/bot" class="<%= request.path_info.start_with?("/bot") ? "active" : nil %>">Grok Bot</a>
+          <a href="/bot" id="nav-bot"<%= bot_agents.any? ? "" : " hidden" %> class="<%= request.path_info.start_with?("/bot") ? "active" : nil %>">Grok Bot</a>
           <a href="/extensions" class="<%= nav_active("/extensions") %>">Plugins &amp; skills</a>
         </nav>
       </div>
