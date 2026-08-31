@@ -41,6 +41,7 @@ Token **lifetime** figures prefer Grok Build 1.0.14+ **`usage.json`** (the same 
 
 ## Requirements
 
+- **macOS or Linux** — Windows is not supported yet (live/stale uses `ps` / `lsof`)
 - **Ruby >= 4.0**
 - Bundler
 
