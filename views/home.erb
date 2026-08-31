@@ -14,9 +14,17 @@
     <div class="sub"><span id="stat-stale"><%= @snap.active_sessions.count(&:stale?) %></span> stale · <span id="stat-running-total"><%= @snap.primary_sessions.sum(&:running_count) %></span> tasks</div>
   </div>
   <div class="stat">
-    <div class="label">Est. tokens</div>
-    <div class="value num" id="stat-tokens"><%= est(@snap.total_est_tokens) %></div>
-    <div class="sub"><% if cost_enabled? %>est. cost <span id="stat-cost"><%= cost_label(@snap.total_est_tokens) %></span><% else %>lifetime proxy · hybrid<% end %></div>
+    <div class="label" id="stat-tokens-label"><%= @snap.billed_count.to_i.positive? ? "Tokens" : "Est. tokens" %></div>
+    <div class="value num" id="stat-tokens"><%= total_tokens_label(@snap) %></div>
+    <div class="sub">
+      <% if @snap.billed_count.to_i.positive? %>
+        <span id="stat-billed-count"><%= @snap.billed_count %></span> billed<% if snapshot_cost_label(@snap) %> · <span id="stat-cost"><%= snapshot_cost_label(@snap) %></span><% end %>
+      <% elsif cost_enabled? %>
+        est. cost <span id="stat-cost"><%= cost_label(@snap.total_est_tokens) %></span>
+      <% else %>
+        lifetime proxy · hybrid
+      <% end %>
+    </div>
   </div>
   <div class="stat">
     <div class="label">Primary sessions</div>
@@ -55,7 +63,7 @@
         <th>Model</th>
         <th class="r">Running</th>
         <th class="r">Turns</th>
-        <th class="r">Est. tok</th>
+        <th class="r">Tokens</th>
       </tr>
     </thead>
     <tbody id="active-tbody">
@@ -77,7 +85,7 @@
           <td><%= h(s.current_model_id || s.models.first) %></td>
           <td class="r num running-cell"><%= s.running_count.positive? ? s.running_count : "—" %></td>
           <td class="r num"><%= s.num_turns %></td>
-          <td class="r num"><%= est(s.est_tokens) %></td>
+          <td class="r num"><%= tok(s) %></td>
         </tr>
       <% end %>
     </tbody>
@@ -95,7 +103,7 @@
       <article class="project-card">
         <div class="row">
           <h3><a href="/projects/<%= h(p.id) %>"><%= h(p.name) %></a></h3>
-          <span class="muted num"><%= p.session_count %> sess · <%= est(p.est_tokens) %></span>
+          <span class="muted num"><%= p.session_count %> sess · <%= project_tokens_label(p) %></span>
         </div>
         <div class="mono path"><%= h(short_path(p.path)) %></div>
         <p class="desc"><%= h(p.description) %></p>
@@ -129,7 +137,7 @@
           <select name="sort" aria-label="Sort sessions" onchange="this.form.submit()">
             <option value="last_active" <%= @sort == "last_active" ? "selected" : "" %>>Last active</option>
             <option value="running" <%= @sort == "running" ? "selected" : "" %>>Running tasks</option>
-            <option value="tokens" <%= @sort == "tokens" ? "selected" : "" %>>Est. tokens</option>
+            <option value="tokens" <%= @sort == "tokens" ? "selected" : "" %>>Tokens</option>
             <option value="title" <%= @sort == "title" ? "selected" : "" %>>Title</option>
           </select>
           <label class="check">
@@ -146,10 +154,13 @@
           <th>Age</th>
           <th>Session</th>
           <th class="r">Run</th>
-          <th class="r">Est. tok</th>
+          <th class="r">Tokens</th>
         </tr>
       </thead>
       <tbody id="recent-tbody">
+        <% if @sorted_sessions.empty? %>
+          <tr><td colspan="4" class="muted"><%= @filter_running ? "No live sessions." : "No sessions." %></td></tr>
+        <% end %>
         <% @sorted_sessions.each do |s| %>
           <tr data-id="<%= h(s.id) %>" data-filter="<%= h("#{s.title} #{s.cwd} #{s.current_model_id} #{s.id} #{s.source_label}") %>" data-running="<%= s.running_count %>" data-tokens="<%= s.est_tokens %>" data-source="<%= h(s.source_key) %>">
             <td class="age muted num"><%= relative_time(s.last_active_at) %></td>
@@ -168,7 +179,7 @@
               </div>
             </td>
             <td class="r num running-cell"><%= s.running_count.positive? ? s.running_count : "—" %></td>
-            <td class="r num"><%= est(s.est_tokens) %></td>
+            <td class="r num"><%= tok(s) %></td>
           </tr>
         <% end %>
       </tbody>

@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-08-31
+
+### Added
+
+- **MCP roster** (`/mcp`): servers from user/project config and installed-plugin `.mcp.json`
+- Status **active** (in-flight call on a live session), **idle** (connected or configured), **suspended** (`enabled = false` / `disabled_mcp_servers`), **failed** (auth/timeout/handshake)
+- Session-detail list of servers that session used (roster lives on `/mcp` only)
+- Env/headers are never read
+
+## [0.6.0] — 2026-08-31
+
+### Added
+
+- Real usage from Grok Build 1.0.14+ `usage.json` (same JSON as `grok usage <session-id>`)
+- Billed input / output / cache-read / reasoning tokens, model calls, and USD (`costUsdTicks` / 10¹⁰)
+- Session-detail recorded-usage panel and per-turn table
+- Copy `grok usage <id>` next to resume
+- Home/header cost from billed totals without setting a napkin rate
+
+### Changed
+
+- Token column drops the **est.** / `~` prefix when the usage ledger covers the session
+- Partial ledgers (recorded turns < session turns) keep the lifetime estimate and flag the billed slice as partial — last-turn input is not treated as lifetime
+- Napkin `GROK_LENS_USD_PER_M_TOKENS` applies only where `usage.json` is missing
+
 ## [0.5.0] — 2026-08-15
 
 ### Added
@@ -116,6 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixture-based unit and Rack tests
 - Tufte-inspired dense paper UI with SVG sparklines
 
+[0.7.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.7.0
+[0.6.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.6.0
 [0.5.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.5.0
 [0.4.1]: https://github.com/monomyth/grok-lens/releases/tag/v0.4.1
 [0.4.0]: https://github.com/monomyth/grok-lens/releases/tag/v0.4.0

@@ -122,6 +122,7 @@
   bindFilter("filter");
   bindFilter("glossary-filter");
   bindFilter("ext-filter");
+  bindFilter("mcp-filter");
 
   /* ---------- Partial poll (home) ---------- */
   var body = document.body;
@@ -255,6 +256,14 @@
     setText("stat-header-sessions", data.primary_sessions);
     setText("stat-tokens", data.total_est_tokens_label);
     setText("stat-header-tokens", data.total_est_tokens_label);
+    if (data.billed_count > 0) {
+      setText("stat-tokens-label", "Tokens");
+      setText("stat-header-tokens-unit", "tokens");
+      setText("stat-billed-count", data.billed_count);
+    } else {
+      setText("stat-tokens-label", "Est. tokens");
+      setText("stat-header-tokens-unit", "est. tokens");
+    }
     if (data.total_cost_label) setText("stat-cost", data.total_cost_label);
     if (data.bot) {
       var hasBot = (data.bot.total || 0) > 0;
@@ -285,7 +294,9 @@
       var src = sourceFilter();
       if (src) list = list.filter(function (s) { return s.source === src; });
       if (runningOnly()) {
-        list = list.filter(function (s) { return (s.running_count || 0) > 0; });
+        list = list.filter(function (s) {
+          return s.status === "active" || (s.running_count || 0) > 0;
+        });
       }
       recentBody.innerHTML = sortSessionList(list).map(renderRecentRow).join("");
       applyTextFilter();
@@ -326,10 +337,10 @@
     var secs = loadPollSeconds();
     if (pollSelect) pollSelect.value = String(secs);
     if (!secs || secs <= 0) {
-      setPollStatus("Token figures are estimates. Polling off.");
+      setPollStatus("usage.json when present; otherwise estimates. Polling off.");
       return;
     }
-    setPollStatus("Estimates only · auto-refresh " + (secs >= 60 ? secs / 60 + "m" : secs + "s"));
+    setPollStatus("usage.json when present · auto-refresh " + (secs >= 60 ? secs / 60 + "m" : secs + "s"));
     pollTimer = setInterval(softRefresh, secs * 1000);
   }
 

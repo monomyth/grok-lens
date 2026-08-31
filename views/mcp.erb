@@ -1,0 +1,74 @@
+<% @title = "MCP · Grok Lens" %>
+
+<header class="detail-header">
+  <h1>MCP servers</h1>
+  <p class="desc">
+    Configured in <code>~/.grok/config.toml</code>, project <code>.grok/config.toml</code>, and installed plugins.
+    Status is derived from live Grok sessions and <code>events.jsonl</code>
+    (connected / in-flight / disabled / connect errors). Env and auth headers are not read.
+  </p>
+  <div class="meta-grid">
+    <div><span class="label">Servers</span><span class="num"><%= @mcp_servers.size %></span></div>
+    <div><span class="label">Active</span><span class="num"><%= @mcp_servers.count(&:active?) %></span></div>
+    <div><span class="label">Idle</span><span class="num"><%= @mcp_servers.count(&:idle?) %></span></div>
+    <div><span class="label">Suspended</span><span class="num"><%= @mcp_servers.count(&:suspended?) %></span></div>
+    <div><span class="label">Failed</span><span class="num"><%= @mcp_servers.count(&:failed?) %></span></div>
+  </div>
+  <input type="search" id="mcp-filter" class="filter wide" placeholder="Filter servers…" aria-label="Filter MCP servers">
+</header>
+
+<section class="block">
+  <% if @mcp_servers.empty? %>
+    <p class="muted">No MCP servers in config, plugins, or session events.</p>
+  <% else %>
+  <table class="ledger" id="mcp-table">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Server</th>
+        <th>Transport</th>
+        <th class="r">Tools</th>
+        <th class="r">Calls</th>
+        <th>Used by</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @mcp_servers.each do |s| %>
+        <tr data-filter="<%= h("#{s.name} #{s.transport} #{s.source} #{s.plugin} #{s.target} #{s.status}") %>">
+          <td><span class="dot <%= h(s.status) %>"></span><%= mcp_status_label(s.status) %></td>
+          <td>
+            <strong class="mono"><%= h(s.name) %></strong>
+            <div class="subline muted">
+              <%= h(s.source) %><% if s.plugin %> · <%= h(s.plugin) %><% end %>
+              <% unless s.enabled %> · disabled<% end %>
+            </div>
+            <% if s.target && !s.target.empty? %>
+              <div class="subline muted mono"><%= h(s.target) %></div>
+            <% end %>
+            <% if s.error && !s.error.empty? %>
+              <div class="subline warn"><%= h(s.error) %></div>
+            <% end %>
+          </td>
+          <td><%= h(s.transport) %></td>
+          <td class="r num"><%= s.tool_count.to_i.positive? ? s.tool_count : "—" %></td>
+          <td class="r num"><%= s.call_count.to_i.positive? ? s.call_count : "—" %></td>
+          <td>
+            <% running = s.live_session_ids.size %>
+            <% if running.positive? %>
+              <span class="num"><%= running %></span>
+              running session<%= running == 1 ? "" : "s" %>
+            <% elsif s.session_ids.any? %>
+              <span class="muted num"><%= s.session_ids.size %> past session<%= s.session_ids.size == 1 ? "" : "s" %></span>
+            <% else %>
+              <span class="muted">configured, unused</span>
+            <% end %>
+            <% if s.session_titles.any? %>
+              <div class="subline muted"><%= h(s.session_titles.first(3).join(" · ")) %></div>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% end %>
+</section>

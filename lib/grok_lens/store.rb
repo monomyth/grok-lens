@@ -71,7 +71,8 @@ module GrokLens
         s.with(running_tasks: tasks)
       end
 
-      assemble_snapshot(sessions, warnings, missing: false)
+      mcp_servers, sessions = attach_mcp(sessions, ps_index)
+      assemble_snapshot(sessions, warnings, missing: false, mcp_servers: mcp_servers)
     end
 
     def enrich_session(session)
@@ -124,7 +125,30 @@ module GrokLens
 
     private
 
-    def assemble_snapshot(sessions, warnings, missing:)
+    def attach_mcp(sessions, ps_index)
+      rows = sessions.filter_map do |s|
+        next unless s.grok?
+
+        dir = session_dir_for(s)
+        next unless dir
+
+        { id: s.id, dir: dir, live: s.active?, title: s.title, cwd: s.cwd }
+      end
+      servers = Mcp.inventory(grok_home: @grok_home, sessions: rows, ps_index: ps_index)
+      by_id = Hash.new { |h, k| h[k] = [] }
+      servers.each do |srv|
+        srv.session_ids.each { |id| by_id[id] << srv.name }
+      end
+      sessions = sessions.map do |s|
+        names = by_id[s.id]
+        names.empty? ? s : s.with(mcp_names: names)
+      end
+      [servers, sessions]
+    rescue StandardError
+      [[], sessions]
+    end
+
+    def assemble_snapshot(sessions, warnings, missing:, mcp_servers: [])
       sessions_by_id = sessions.to_h { |s| [s.id, s] }
       primaries = sessions.select(&:primary?).sort_by { |s| s.last_active_at || s.created_at || Time.at(0) }.reverse
       projects = build_projects(primaries, warnings)
@@ -132,6 +156,7 @@ module GrokLens
                         .sort_by { |s| s.opened_at || s.last_active_at || Time.at(0) }.reverse
 
       total_est = sessions.sum { |s| s.est_tokens.to_i }
+      billed_rows = sessions.select(&:billed?)
       models_hist = Hash.new(0)
       primaries.each do |s|
         (s.models.empty? ? [s.current_model_id].compact : s.models).each { |m| models_hist[m] += 1 }
@@ -146,7 +171,11 @@ module GrokLens
         active_sessions: active,
         warnings: warnings,
         total_est_tokens: total_est,
+        total_billed_tokens: billed_rows.sum { |s| s.est_tokens.to_i },
+        total_cost_usd: billed_rows.map(&:cost_usd).compact.sum,
+        billed_count: billed_rows.size,
         models_hist: models_hist,
+        mcp_servers: Array(mcp_servers),
         missing_home: missing
       )
     end
@@ -161,7 +190,11 @@ module GrokLens
         active_sessions: [],
         warnings: warnings,
         total_est_tokens: 0,
+        total_billed_tokens: 0,
+        total_cost_usd: 0,
+        billed_count: 0,
         models_hist: {},
+        mcp_servers: [],
         missing_home: missing
       )
     end
@@ -333,7 +366,8 @@ module GrokLens
         session_dir: session_dir,
         chat_history_bytes: chat_bytes,
         events_bytes: events_bytes,
-        num_messages: num_messages
+        num_messages: num_messages,
+        num_turns: summary["next_trace_turn"].to_i
       )
 
       active = active_map[sid]
@@ -369,6 +403,9 @@ module GrokLens
         context_tokens: tok[:context_tokens],
         context_window: tok[:context_window],
         est_source: tok[:est_source],
+        billed: tok[:billed],
+        cost_usd: tok[:cost_usd],
+        usage: tok[:usage],
         disk_bytes: disk,
         agent_name: summary["agent_name"],
         session_kind: kind,
@@ -382,7 +419,8 @@ module GrokLens
         detail_loaded: false,
         running_tasks: [],
         source: :grok,
-        bot_section: nil
+        bot_section: nil,
+        mcp_names: []
       )
     end
 
@@ -713,8 +751,11 @@ module GrokLens
         name = File.basename(path.to_s)
         name = path if name.nil? || name.empty?
         last = sess.map { |s| s.last_active_at }.compact.max
-        est = sess.sum { |s| s.est_tokens.to_i + s.children.sum { |c| c.est_tokens.to_i } }
-        disk = sess.sum { |s| s.disk_bytes.to_i + s.children.sum { |c| c.disk_bytes.to_i } }
+        family = sess.flat_map { |s| [s, *Array(s.children)] }
+        est = family.sum { |s| s.est_tokens.to_i }
+        billed_tok = family.select(&:billed?).sum { |s| s.est_tokens.to_i }
+        billed_cost = family.select(&:billed?).map(&:cost_usd).compact.sum
+        disk = family.sum { |s| s.disk_bytes.to_i }
         hist = Hash.new(0)
         sess.each do |s|
           ([s.current_model_id] + s.models).compact.uniq.each { |m| hist[m] += 1 }
@@ -728,6 +769,8 @@ module GrokLens
           sessions: sess.sort_by { |s| s.last_active_at || Time.at(0) }.reverse,
           session_count: sess.size,
           est_tokens: est,
+          billed_tokens: billed_tok,
+          cost_usd: billed_cost.positive? ? billed_cost : nil,
           models_hist: hist,
           last_active_at: last,
           disk_bytes: disk

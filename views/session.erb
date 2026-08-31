@@ -27,10 +27,11 @@
   <div class="meta-grid">
     <div><span class="label">Model</span><span><%= h(@session.current_model_id) %></span></div>
     <div><span class="label">Models used</span><span><%= h(@session.models.join(", ")) %></span></div>
-    <div><span class="label">Est. tokens</span><span class="num"><%= est(@session.est_tokens) %></span><div class="subline muted"><%= h(@session.est_source || "size") %></div></div>
+    <div><span class="label"><%= @session.billed? ? "Tokens" : "Est. tokens" %></span><span class="num"><%= tok(@session) %></span><div class="subline muted"><%= h(token_source_label(@session)) %></div></div>
     <div><span class="label">Context</span><span class="num"><%= ctx_label(@session) %></span></div>
-    <% if cost_enabled? %>
-    <div><span class="label">Est. cost</span><span class="num"><%= cost_label(@session.est_tokens) %></span></div>
+    <% usd = session_cost_usd(@session); kind = session_cost_kind(@session) %>
+    <% if usd %>
+    <div><span class="label"><%= kind == "billed" ? "Cost" : (kind == "recorded" ? "Recorded cost" : "Est. cost") %></span><span class="num"><%= usd_label(usd) %></span></div>
     <% end %>
     <div><span class="label">Disk</span><span class="num"><%= bytes(@session.disk_bytes) %></span></div>
     <div><span class="label">Running</span><span class="num"><%= @session.running_count %></span></div>
@@ -56,8 +57,98 @@
       <button type="button" class="btn small" data-copy-text="<%= h(cmd) %>">Copy resume</button>
     </div>
     <% end %>
+    <% if (ucmd = usage_command(@session)) %>
+    <div class="copy-row">
+      <code class="copy-value mono" id="usage-cmd"><%= h(ucmd) %></code>
+      <button type="button" class="btn small" data-copy-text="<%= h(ucmd) %>">Copy usage</button>
+    </div>
+    <% end %>
   </div>
 </header>
+
+<% if @session.recorded_usage? %>
+<% u = @session.usage %>
+<section class="block">
+  <h2 class="section-title">Recorded usage</h2>
+  <p class="desc">
+    From <span class="mono">usage.json</span>
+    <% if u[:incomplete] %>
+      · partial — <%= u[:recorded_turns] %> of <%= @session.num_turns %> turns (ledger started mid-session)
+    <% elsif u[:recorded_turns].to_i.positive? %>
+      · <%= u[:recorded_turns] %> turns
+    <% end %>
+    <% if u[:primary_model_id] %> · <%= h(u[:primary_model_id]) %><% end %>
+    <% if u[:model_calls].to_i.positive? %> · <%= u[:model_calls] %> calls<% end %>
+  </p>
+  <p class="usage-break num">
+    <% if u[:input_tokens].to_i.positive? %><span>in <%= est(u[:input_tokens], approx: false) %></span><% end %>
+    <% if u[:output_tokens].to_i.positive? %><span>out <%= est(u[:output_tokens], approx: false) %></span><% end %>
+    <% if u[:cached_read_tokens].to_i.positive? %><span>cache read <%= est(u[:cached_read_tokens], approx: false) %></span><% end %>
+    <% if u[:cache_creation_tokens].to_i.positive? %><span>cache write <%= est(u[:cache_creation_tokens], approx: false) %></span><% end %>
+    <% if u[:reasoning_tokens].to_i.positive? %><span>reasoning <%= est(u[:reasoning_tokens], approx: false) %></span><% end %>
+    <% if u[:total_tokens].to_i.positive? %><span>total <%= est(u[:total_tokens], approx: false) %></span><% end %>
+    <% if u[:cost_usd] %><span><%= usd_label(u[:cost_usd]) %></span><% end %>
+  </p>
+  <% if Array(u[:turns]).any? %>
+  <table class="ledger compact">
+    <thead>
+      <tr>
+        <th class="r">Turn</th>
+        <th>Ended</th>
+        <th class="r">In</th>
+        <th class="r">Out</th>
+        <th class="r">Cache</th>
+        <th class="r">Total</th>
+        <th class="r">Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% Array(u[:turns]).each do |t| %>
+        <tr>
+          <td class="r num"><%= t[:turn_number] %></td>
+          <td class="muted num"><%= t[:ended_at].to_s[0, 19] %></td>
+          <td class="r num"><%= est(t[:input_tokens], approx: false) %></td>
+          <td class="r num"><%= est(t[:output_tokens], approx: false) %></td>
+          <td class="r num"><%= t[:cached_read_tokens].to_i.positive? ? est(t[:cached_read_tokens], approx: false) : "—" %></td>
+          <td class="r num"><%= est(t[:total_tokens], approx: false) %></td>
+          <td class="r num"><%= t[:cost_usd] ? usd_label(t[:cost_usd]) : "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% end %>
+</section>
+<% end %>
+
+<% mcp_here = Array(@snap.mcp_servers).select { |m| Array(@session.mcp_names).include?(m.name) } %>
+<% if mcp_here.any? %>
+<section class="block">
+  <h2 class="section-title">MCP servers <span class="muted num">(<%= mcp_here.size %>)</span></h2>
+  <table class="ledger compact">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Server</th>
+        <th>Transport</th>
+        <th class="r">Tools</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% mcp_here.each do |m| %>
+        <tr>
+          <td><span class="dot <%= h(m.status) %>"></span><%= mcp_status_label(m.status) %></td>
+          <td>
+            <a href="/mcp" class="mono"><%= h(m.name) %></a>
+            <% if m.error %><div class="subline warn"><%= h(m.error) %></div><% end %>
+          </td>
+          <td><%= h(m.transport) %></td>
+          <td class="r num"><%= m.tool_count.to_i.positive? ? m.tool_count : "—" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+<% end %>
 
 <% if @session.running_count.positive? %>
 <section class="block">
@@ -118,7 +209,7 @@
         <th>Title</th>
         <th>Model</th>
         <th class="r">Msgs</th>
-        <th class="r">Est. tok</th>
+        <th class="r">Tokens</th>
       </tr>
     </thead>
     <tbody>
@@ -127,7 +218,7 @@
           <td><a href="/sessions/<%= h(c.id) %>"><%= h(c.title) %></a></td>
           <td><%= h(c.current_model_id) %></td>
           <td class="r num"><%= c.num_messages %></td>
-          <td class="r num"><%= est(c.est_tokens) %></td>
+          <td class="r num"><%= tok(c) %></td>
         </tr>
       <% end %>
     </tbody>

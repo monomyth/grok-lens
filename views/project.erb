@@ -8,7 +8,7 @@
   <p class="desc"><%= h(@project.description) %></p>
   <div class="meta-grid">
     <div><span class="label">Sessions</span><span class="num"><%= @project.session_count %></span></div>
-    <div><span class="label">Est. tokens</span><span class="num"><%= est(@project.est_tokens) %></span></div>
+    <div><span class="label"><%= @project.billed_tokens.to_i.positive? && @project.billed_tokens == @project.est_tokens ? "Tokens" : "Est. tokens" %></span><span class="num"><%= project_tokens_label(@project) %></span></div>
     <div><span class="label">Disk</span><span class="num"><%= bytes(@project.disk_bytes) %></span></div>
     <div><span class="label">Last active</span><span class="num"><%= relative_time(@project.last_active_at) %></span></div>
   </div>
@@ -25,7 +25,7 @@
         <th>Model</th>
         <th class="r">Turns</th>
         <th class="r">Msgs</th>
-        <th class="r">Est. tok</th>
+        <th class="r">Tokens</th>
         <th class="r">Active</th>
       </tr>
     </thead>
@@ -40,7 +40,7 @@
           <td><%= h(s.current_model_id) %></td>
           <td class="r num"><%= s.num_turns %></td>
           <td class="r num"><%= s.num_messages %></td>
-          <td class="r num"><%= est(s.est_tokens) %></td>
+          <td class="r num"><%= tok(s) %></td>
           <td class="r muted num"><%= relative_time(s.last_active_at) %></td>
         </tr>
         <% s.children.each do |c| %>
@@ -50,7 +50,7 @@
             <td><%= h(c.current_model_id) %></td>
             <td class="r num"><%= c.num_turns %></td>
             <td class="r num"><%= c.num_messages %></td>
-            <td class="r num"><%= est(c.est_tokens) %></td>
+            <td class="r num"><%= tok(c) %></td>
             <td class="r muted num"><%= relative_time(c.last_active_at) %></td>
           </tr>
         <% end %>

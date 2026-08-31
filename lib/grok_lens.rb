@@ -9,6 +9,7 @@ require_relative "grok_lens/models"
 require_relative "grok_lens/estimate"
 require_relative "grok_lens/presenters"
 require_relative "grok_lens/catalog"
+require_relative "grok_lens/mcp"
 require_relative "grok_lens/search"
 require_relative "grok_lens/store"
 require_relative "grok_lens/bot"
@@ -17,5 +18,5 @@ require_relative "grok_lens/cursor"
 require_relative "grok_lens/app"
 
 module GrokLens
-  VERSION = "0.5.0"
+  VERSION = "0.7.0"
 end

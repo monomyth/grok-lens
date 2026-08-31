@@ -24,7 +24,7 @@ GROK_HOME=/path/to/fixture bundle exec rackup -o 127.0.0.1 -p 9292
 - Keep the tool **read-only** with respect to `GROK_HOME`
 - Prefer small, focused PRs
 - Add or update tests for store parsing and HTTP routes when behavior changes
-- Token figures must remain clearly labeled as **estimates** unless real API usage fields appear in Grok’s on-disk format
+- Token figures from `usage.json` are billed; otherwise keep them labeled as **estimates**
 
 ## Code layout
 

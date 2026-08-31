@@ -33,6 +33,9 @@ module GrokLens
     :context_tokens,
     :context_window,
     :est_source,
+    :billed,
+    :cost_usd,
+    :usage,
     :disk_bytes,
     :agent_name,
     :session_kind,
@@ -46,7 +49,8 @@ module GrokLens
     :detail_loaded,
     :running_tasks,
     :source,       # :grok | :bot
-    :bot_section
+    :bot_section,
+    :mcp_names
   ) do
     def primary?
       # Top-level ledger rows: anything without a known parent (orphan subagents included)
@@ -66,6 +70,11 @@ module GrokLens
       Array(running_tasks).count(&:live)
     end
 
+    # Home "Running only": a live Grok process, or in-flight tasks.
+    def running_now?
+      active? || running_count.positive?
+    end
+
     def live_children_count
       Array(children).count(&:active?)
     end
@@ -80,6 +89,18 @@ module GrokLens
 
     def grok?
       source_key == :grok
+    end
+
+    def billed?
+      billed == true
+    end
+
+    def recorded_usage?
+      usage.is_a?(Hash) && (usage[:total_tokens].to_i.positive? || usage[:model_calls].to_i.positive?)
+    end
+
+    def tokens_label
+      Estimate.format_tokens(est_tokens, approx: !billed?)
     end
 
     def source_label
@@ -133,6 +154,8 @@ module GrokLens
     :sessions,
     :session_count,
     :est_tokens,
+    :billed_tokens,
+    :cost_usd,
     :models_hist,
     :last_active_at,
     :disk_bytes
@@ -147,7 +170,11 @@ module GrokLens
     :active_sessions,
     :warnings,
     :total_est_tokens,
+    :total_billed_tokens,
+    :total_cost_usd,
+    :billed_count,
     :models_hist,
+    :mcp_servers,
     :missing_home
   ) do
     def session(id)

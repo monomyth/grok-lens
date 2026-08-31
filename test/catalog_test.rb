@@ -111,6 +111,9 @@ class CatalogTest < Minitest::Test
       context_tokens: nil,
       context_window: nil,
       est_source: "size",
+      billed: false,
+      cost_usd: nil,
+      usage: nil,
       disk_bytes: 0,
       agent_name: nil,
       session_kind: nil,
@@ -124,7 +127,8 @@ class CatalogTest < Minitest::Test
       detail_loaded: false,
       running_tasks: [],
       source: :grok,
-      bot_section: nil
+      bot_section: nil,
+      mcp_names: []
     )
     cmd = GrokLens::Presenters.resume_command(session)
     assert_equal "grok --cwd /Users/demo/code/acme-api --resume aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", cmd

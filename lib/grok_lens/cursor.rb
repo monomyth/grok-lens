@@ -67,6 +67,9 @@ module GrokLens
             context_tokens: nil,
             context_window: nil,
             est_source: nil,
+            billed: false,
+            cost_usd: nil,
+            usage: nil,
             disk_bytes: File.size(path),
             agent_name: nil,
             session_kind: nil,
@@ -80,7 +83,8 @@ module GrokLens
             detail_loaded: false,
             running_tasks: [],
             source: :cursor,
-            bot_section: nil
+            bot_section: nil,
+            mcp_names: []
           )
         end
       end

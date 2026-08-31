@@ -69,8 +69,12 @@ module GrokLens
         snap
       end
 
-      def est(n)
-        Estimate.format_tokens(n)
+      def est(n, approx: true)
+        Estimate.format_tokens(n, approx: approx)
+      end
+
+      def tok(s)
+        Estimate.format_tokens(s.est_tokens, approx: !s.billed?)
       end
 
       def bytes(n)
@@ -83,11 +87,60 @@ module GrokLens
 
       def cost_label(tokens)
         rate = GrokLens::Config.usd_per_m_tokens
-        Estimate.format_cost(Estimate.cost_usd(tokens, rate))
+        usd_label(Estimate.cost_usd(tokens, rate))
+      end
+
+      def usd_label(usd)
+        Estimate.format_cost(usd)
       end
 
       def cost_enabled?
         !GrokLens::Config.usd_per_m_tokens.nil?
+      end
+
+      def session_cost_usd(s)
+        return s.cost_usd if s.billed? && !s.cost_usd.nil?
+        return s.usage[:cost_usd] if s.recorded_usage? && s.usage[:cost_usd]
+        return Estimate.cost_usd(s.est_tokens, GrokLens::Config.usd_per_m_tokens) if cost_enabled?
+
+        nil
+      end
+
+      def session_cost_kind(s)
+        return "billed" if s.billed? && s.cost_usd
+        return "recorded" if s.recorded_usage? && s.usage[:cost_usd]
+        return "est" if cost_enabled?
+
+        nil
+      end
+
+      def token_source_label(s)
+        return "usage.json" if s.billed?
+        return "#{s.est_source || "size"} · partial usage.json" if s.recorded_usage? && s.usage[:incomplete]
+
+        s.est_source || "size"
+      end
+
+      def total_tokens_label(snap)
+        unbilled = snap.sessions_by_id.values.count { |s| s.grok? && !s.billed? && s.est_tokens.to_i.positive? }
+        Estimate.format_tokens(snap.total_est_tokens, approx: unbilled.positive? || snap.billed_count.to_i.zero?)
+      end
+
+      def project_tokens_label(project)
+        all_billed = project.billed_tokens.to_i.positive? && project.billed_tokens == project.est_tokens
+        Estimate.format_tokens(project.est_tokens, approx: !all_billed)
+      end
+
+      def snapshot_cost_label(snap)
+        return usd_label(snap.total_cost_usd) if snap.total_cost_usd.to_f.positive?
+
+        cost_label(snap.total_est_tokens) if cost_enabled?
+      end
+
+      def usage_command(session)
+        return nil unless session.respond_to?(:source_key) && session.source_key == :grok
+
+        "grok usage #{session.id}"
       end
 
       def poll_seconds_default
@@ -128,7 +181,7 @@ module GrokLens
       @src = params["src"].to_s
       list = @snap.primary_sessions
       list = list.select { |s| s.source_key.to_s == @src } unless @src.empty?
-      list = list.select { |s| s.running_count.positive? } if @filter_running
+      list = list.select(&:running_now?) if @filter_running
       @sorted_sessions = sort_sessions(list, @sort)
       @source_counts = @snap.primary_sessions.each_with_object(Hash.new(0)) { |s, h| h[s.source_key] += 1 }
       @bot_agents = bot_agents
@@ -189,6 +242,12 @@ module GrokLens
       erb :extensions
     end
 
+    get "/mcp" do
+      @snap = snapshot
+      @mcp_servers = Array(@snap.mcp_servers)
+      erb :mcp
+    end
+
     get "/projects/*" do
       @snap = snapshot
       raw = params["splat"].first.to_s
@@ -226,14 +285,18 @@ module GrokLens
         total_sessions: snap.sessions_by_id.size,
         projects: snap.projects.size,
         total_est_tokens: snap.total_est_tokens,
-        total_est_tokens_label: Estimate.format_tokens(snap.total_est_tokens),
-        total_cost_label: Estimate.format_cost(Estimate.cost_usd(snap.total_est_tokens, rate)),
-        cost_enabled: !rate.nil?,
+        total_est_tokens_label: total_tokens_label(snap),
+        total_billed_tokens: snap.total_billed_tokens,
+        billed_count: snap.billed_count,
+        total_cost_usd: snap.total_cost_usd,
+        total_cost_label: snapshot_cost_label(snap),
+        cost_enabled: !rate.nil? || snap.total_cost_usd.to_f.positive?,
         active: snap.active_sessions.count(&:active?),
         stale: snap.active_sessions.count(&:stale?),
         total_running: snap.primary_sessions.sum(&:running_count),
         warnings: snap.warnings.size,
         models_hist: snap.models_hist,
+        mcp: mcp_summary_json(snap),
         active_sessions: snap.active_sessions.map { |s| session_json(s) },
         recent_sessions: snap.primary_sessions.map { |s| session_json(s) },
         bot: bot_summary_json(force ? settings.bot_agents : bot_agents),
@@ -245,7 +308,9 @@ module GrokLens
             description: p.description,
             session_count: p.session_count,
             est_tokens: p.est_tokens,
-            est_tokens_label: Estimate.format_tokens(p.est_tokens),
+            est_tokens_label: project_tokens_label(p),
+            billed_tokens: p.billed_tokens,
+            cost_usd: p.cost_usd,
             last_active_at: p.last_active_at&.utc&.iso8601
           }
         }
@@ -300,7 +365,10 @@ module GrokLens
           num_turns: s.num_turns,
           num_messages: s.num_messages,
           est_tokens: s.est_tokens,
-          est_tokens_label: Estimate.format_tokens(s.est_tokens),
+          est_tokens_label: s.tokens_label,
+          billed: s.billed?,
+          cost_usd: s.cost_usd,
+          usage_incomplete: s.recorded_usage? && s.usage[:incomplete],
           context_tokens: s.context_tokens,
           context_label: Estimate.format_context(s.context_tokens, s.context_window),
           est_source: s.est_source,
@@ -312,11 +380,40 @@ module GrokLens
           source_label: s.source_label,
           bot_section: s.bot_section,
           running_count: s.running_count,
+          running_now: s.running_now?,
           running_tasks: Array(s.running_tasks).select(&:live).map { |t|
             { id: t.id, kind: t.kind.to_s, title: t.title, status: t.status, tool_name: t.tool_name }
           },
           resume_command: resume_command(s),
-          continue_command: continue_command(s)
+          continue_command: continue_command(s),
+          mcp_names: Array(s.mcp_names)
+        }
+      end
+
+      def mcp_summary_json(snap)
+        list = Array(snap.mcp_servers)
+        {
+          total: list.size,
+          active: list.count(&:active?),
+          idle: list.count(&:idle?),
+          suspended: list.count(&:suspended?),
+          failed: list.count(&:failed?),
+          servers: list.map { |s|
+            {
+              name: s.name,
+              status: s.status.to_s,
+              transport: s.transport,
+              source: s.source,
+              plugin: s.plugin,
+              target: s.target,
+              enabled: s.enabled,
+              error: s.error,
+              tool_count: s.tool_count,
+              call_count: s.call_count,
+              live: s.live_session_ids.size,
+              sessions: s.session_ids.size
+            }
+          }
         }
       end
 

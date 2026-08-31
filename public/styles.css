@@ -347,6 +347,8 @@ form.inline { display: inline; margin: 0; }
 .dot.active { background: var(--live); box-shadow: 0 0 0 1px var(--live); }
 .dot.stale { background: transparent; border: 1px solid var(--stale); }
 .dot.idle { background: var(--rule); }
+.dot.suspended { background: transparent; border: 1px dashed var(--idle); }
+.dot.failed { background: var(--stale); }
 
 .badge {
   font-family: var(--font-sans);
@@ -476,6 +478,10 @@ form.inline { display: inline; margin: 0; }
 }
 .meta-grid .label { display: block; margin-bottom: 0.1rem; }
 
+.usage-break { margin: 0.35rem 0 0.75rem; font-size: 0.92rem; }
+.usage-break span { margin-right: 0.85rem; white-space: nowrap; }
+table.ledger.compact { font-size: 0.86rem; }
+
 .crumb {
   font-family: var(--font-sans);
   font-size: 0.78rem;
@@ -530,7 +536,7 @@ form.inline { display: inline; margin: 0; }
   flex-wrap: wrap;
   gap: 0.75rem 1.25rem;
 }
-.site-footer .warn { color: var(--stale); }
+.site-footer .warn, .subline.warn { color: var(--stale); }
 
 .status-text {
   font-family: var(--font-sans);

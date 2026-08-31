@@ -99,6 +99,16 @@ module GrokLens
       end
     end
 
+    def mcp_status_label(status)
+      case status.to_sym
+      when :active then "active"
+      when :idle then "idle"
+      when :suspended then "suspended"
+      when :failed then "failed"
+      else status.to_s
+      end
+    end
+
     def sparkline_svg(points, width: 120, height: 24)
       pts = Array(points).map(&:to_f)
       return %(<svg class="spark" width="#{width}" height="#{height}"></svg>) if pts.size < 2

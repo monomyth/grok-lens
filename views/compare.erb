@@ -48,9 +48,9 @@
           ["Model", @session_a.current_model_id, @session_b.current_model_id],
           ["Turns", @session_a.num_turns, @session_b.num_turns],
           ["Messages", @session_a.num_messages, @session_b.num_messages],
-          ["Est. tokens", est(@session_a.est_tokens), est(@session_b.est_tokens)],
+          ["Tokens", tok(@session_a), tok(@session_b)],
           ["Context", ctx_label(@session_a), ctx_label(@session_b)],
-          ["Est. source", @session_a.est_source, @session_b.est_source],
+          ["Source", token_source_label(@session_a), token_source_label(@session_b)],
           ["Running tasks", @session_a.running_count, @session_b.running_count],
           ["Subagents", @session_a.children.size, @session_b.children.size],
           ["Live subagents", @session_a.live_children_count, @session_b.live_children_count],
@@ -58,8 +58,8 @@
           ["Last active", relative_time(@session_a.last_active_at), relative_time(@session_b.last_active_at)],
           ["Duration", duration_label(@session_a), duration_label(@session_b)]
         ]
-        if cost_enabled?
-          rows.insert(7, ["Est. cost", cost_label(@session_a.est_tokens), cost_label(@session_b.est_tokens)])
+        if session_cost_usd(@session_a) || session_cost_usd(@session_b)
+          rows.insert(7, ["Cost", usd_label(session_cost_usd(@session_a)), usd_label(session_cost_usd(@session_b))])
         end
       %>
       <% rows.each do |label, a, b| %>

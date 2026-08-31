@@ -151,6 +151,46 @@ module FixtureHelper
     File.write(File.join(dir, "summary.json"), JSON.pretty_generate(data))
   end
 
+  def write_usage(dir, session_id, turns: 1, input: 1000, output: 200, cached: 0,
+                  reasoning: 0, calls: 1, cost_ticks: 10_000_000_000, model: "grok-4.6-build",
+                  turn_numbers: nil)
+    total = input + output
+    bucket = {
+      "inputTokens" => input,
+      "outputTokens" => output,
+      "cachedReadTokens" => cached,
+      "cacheCreationTokens" => 0,
+      "reasoningTokens" => reasoning,
+      "totalTokens" => total,
+      "modelCalls" => calls,
+      "costUsdTicks" => cost_ticks,
+      "turnCount" => turns,
+      "primaryModelId" => model,
+      "modelUsage" => {
+        model => {
+          "inputTokens" => input,
+          "outputTokens" => output,
+          "cachedReadTokens" => cached,
+          "cacheCreationTokens" => 0,
+          "reasoningTokens" => reasoning,
+          "totalTokens" => total,
+          "modelCalls" => calls,
+          "costUsdTicks" => cost_ticks
+        }
+      }
+    }
+    nums = turn_numbers || (1..turns).to_a
+    payload = {
+      "sessionId" => session_id,
+      "updatedAt" => "2026-08-31T20:00:00Z",
+      "session" => bucket,
+      "turns" => nums.map { |n|
+        bucket.merge("turnNumber" => n, "endedAt" => "2026-08-31T20:00:00Z")
+      }
+    }
+    File.write(File.join(dir, "usage.json"), JSON.pretty_generate(payload))
+  end
+
   def build_bot_fixture(root)
     FileUtils.rm_rf(root)
     persist = File.join(root, "sand-client-persistence")

@@ -12,19 +12,20 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 
 ## Features
 
-- **Projects** by working directory — path, short description, model mix, est. tokens
-- **Sessions** — **live** / **stale** / **idle**, models, turns, est. tokens, context window
+- **Projects** by working directory — path, short description, model mix, tokens
+- **Sessions** — **live** / **stale** / **idle**, models, turns, billed or est. tokens, context window, cost
 - **Codex / Cursor** — optional session sources on Home (chips only if discovered)
 - **Grok Bot** — separate agent roster (`/bot`): section, working/idle, activity skim when working. Hidden unless agents are discovered
 - **Running tasks** — in-flight bg shells / tools / live subagents (with process/port liveness checks)
 - **Nested subagents** — `+N sub · K live`
 - **Search** — FTS over Grok’s `session_search.sqlite`
 - **Compare** — side-by-side metrics for two sessions
-- **Copy** session id and `grok --cwd … --resume <id>`
+- **Copy** session id, `grok --cwd … --resume <id>`, and `grok usage <id>`
 - **Light / dark / system** theme (single cycle control)
 - **Live polling** re-renders Active + Sessions (any sort/filter) without a full page reload
+- **MCP** tab — servers that sessions used, with active / idle / suspended / failed status
 - **Glossary** of slash commands · **plugins & skills** inventory
-- Sort / filter sessions (last active, running, tokens, title; running-only)
+- Sort / filter sessions (last active, running tasks, tokens, title; **Running only** = live process or in-flight tasks)
 
 ### Status meanings
 
@@ -36,7 +37,7 @@ Ruby **4.x** · Sinatra · Tufte-inspired dense UI
 | **idle** | No live process |
 | **N running** | Live in-flight work units (bg shell, tool, subagent) after liveness checks |
 
-Token **lifetime** figures are **estimates** (hybrid: `signals.json` + on-disk sizes). **Context** comes from Grok’s `signals.json` when present. Optional napkin **cost** only if you set a rate (see below) — not real billing.
+Token **lifetime** figures prefer Grok Build 1.0.14+ **`usage.json`** (the same ledger as `grok usage <session-id>`): billed input/output/cache/reasoning tokens and USD. Completeness is checked against session turn count — a partial ledger (old session that started recording mid-conversation) stays labeled **est.** and the recorded slice is shown separately. Sessions without `usage.json` keep the hybrid estimate (`signals.json` + on-disk sizes). **Context** still comes from `signals.json`. Optional napkin **cost** (`GROK_LENS_USD_PER_M_TOKENS`) is only for sessions without billed totals.
 
 ## Requirements
 
@@ -68,7 +69,7 @@ Open **http://127.0.0.1:9292**
 | `HOST` | `127.0.0.1` | Bind address |
 | `PORT` | `9292` | HTTP port |
 | `GROK_LENS_POLL_SECONDS` | `300` | Default auto-refresh (UI can override; `0` = off) |
-| `GROK_LENS_USD_PER_M_TOKENS` | unset | **Optional** USD per 1M tokens for est. cost — leave unset to hide cost |
+| `GROK_LENS_USD_PER_M_TOKENS` | unset | **Optional** USD per 1M tokens for est. cost on sessions *without* `usage.json`. Billed cost from the ledger is always shown when present. |
 | `GROK_LENS_CONFIG` | `~/.grok-lens.yml` | Optional YAML (`usd_per_m_tokens`) — see `config.example.yml` |
 | `GROK_LENS_GROK_BOT` | on | Set `0` to hide Grok Bot agents |
 | `GROK_LENS_GROK_BOT_APP` | `~/Library/Application Support/Grok Bot` | Desktop persistence root |
@@ -92,6 +93,9 @@ Dual-home dashboard (synthetic demo data — not real session history):
 | Path | Use |
 |------|-----|
 | `sessions/<cwd>/<id>/summary.json` | Titles, models, counts, times |
+| `config.toml` `[mcp_servers]` + plugin `.mcp.json` | MCP roster (no env/headers) |
+| `events.jsonl` `mcp_*` | MCP connect / fail / tool-call status |
+| `usage.json` | Billed tokens + cost (`grok usage`); per-turn table on session detail |
 | `signals.json` | Context tokens / window, turns, tools (when present) |
 | `events.jsonl` | Models, tools, activity sparkline |
 | `updates.jsonl` | In-flight / background tool status |

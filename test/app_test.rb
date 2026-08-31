@@ -132,6 +132,41 @@ class AppTest < Minitest::Test
     assert body.key?("scan_ms")
   end
 
+  def test_mcp_roster_page
+    File.write(File.join(@home, "config.toml"), <<~TOML)
+      disabled_mcp_servers = ["xapi"]
+      [mcp_servers.blender]
+      command = "/opt/venv/bin/python"
+      args = ["/opt/blender_mcp_server.py"]
+      [mcp_servers.xapi]
+      command = "npx"
+      enabled = false
+    TOML
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    File.write(File.join(dir, "events.jsonl"), [
+      { type: "mcp_server_connected", server_name: "blender", tool_count: 3, tools: ["list_objects"] }.to_json,
+      { type: "mcp_tool_call_started", server_name: "blender", tool_name: "list_objects" }.to_json,
+      { type: "mcp_tool_call_completed", server_name: "blender", tool_name: "list_objects", success: true }.to_json
+    ].join("\n") + "\n")
+    GrokLens::App.set :snapshot, nil
+    get "/mcp"
+    assert last_response.ok?
+    assert_match(/MCP servers/, last_response.body)
+    assert_match(/blender/, last_response.body)
+    assert_match(/xapi/, last_response.body)
+    assert_match(/suspended/, last_response.body)
+
+    get "/"
+    assert last_response.ok?
+    refute_match(/id="mcp-home-block"/, last_response.body)
+    assert_match(/href="\/mcp"/, last_response.body)
+
+    get "/sessions/#{@ids[:parent_id]}"
+    assert last_response.ok?
+    assert_match(/MCP servers/, last_response.body)
+    assert_match(/blender/, last_response.body)
+  end
+
   def test_glossary_and_extensions_routes
     get "/glossary"
     assert last_response.ok?
@@ -153,7 +188,15 @@ class AppTest < Minitest::Test
 
     get "/compare", a: @ids[:parent_id], b: @ids[:idle_id]
     assert last_response.ok?
-    assert_match(/Est\. tokens/i, last_response.body)
+    assert_match(/Tokens/, last_response.body)
+  end
+
+  def test_running_only_includes_live_sessions_without_inflight_tasks
+    get "/", running: "1"
+    assert last_response.ok?
+    table = last_response.body[/<tbody id="recent-tbody">(.*?)<\/tbody>/m, 1].to_s
+    assert_match(/Parent Session Title/, table)
+    refute_match(/Older Idle Session/, table)
   end
 
   def test_home_sort_params
@@ -229,6 +272,61 @@ class AppTest < Minitest::Test
     get "/extensions"
     assert last_response.ok?, last_response.body[0, 400]
     assert_match(/weird-plugin/i, last_response.body)
+  end
+
+  def test_session_shows_billed_usage_json
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    FixtureHelper.write_usage(
+      dir, @ids[:parent_id],
+      turns: 3, input: 10_000, output: 400, cached: 2_000,
+      reasoning: 50, calls: 4, cost_ticks: 4_608_349_120
+    )
+    GrokLens::App.set :snapshot, nil
+    get "/sessions/#{@ids[:parent_id]}"
+    assert last_response.ok?
+    assert_match(/Recorded usage/, last_response.body)
+    assert_match(/usage\.json/, last_response.body)
+    assert_match(/\$0\.4608/, last_response.body)
+    assert_match(/10k/, last_response.body)
+    refute_match(/Est\. tokens/, last_response.body)
+    assert_match(/grok usage/, last_response.body)
+    assert_match(/cache read/, last_response.body)
+
+    get "/"
+    assert last_response.ok?
+    assert_match(/\$0\.4608/, last_response.body)
+    assert_match(/>10k</, last_response.body)
+
+    get "/api/snapshot?refresh=1"
+    body = JSON.parse(last_response.body)
+    parent = body["recent_sessions"].find { |s| s["id"] == @ids[:parent_id] }
+    assert parent["billed"]
+    assert_equal "10k", parent["est_tokens_label"]
+    assert_in_delta 0.4608, body["total_cost_usd"], 0.0001
+    assert body["billed_count"] >= 1
+  end
+
+  def test_session_partial_usage_keeps_estimate_and_shows_recorded
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    File.write(File.join(dir, "signals.json"), JSON.pretty_generate(
+      "contextTokensUsed" => 50_000,
+      "contextWindowTokens" => 500_000,
+      "turnCount" => 28,
+      "toolCallCount" => 20
+    ))
+    FixtureHelper.write_usage(
+      dir, @ids[:parent_id],
+      turns: 1, input: 539_483, output: 433, cached: 237_568,
+      reasoning: 178, calls: 2, cost_ticks: 4_608_349_120,
+      turn_numbers: [28]
+    )
+    GrokLens::App.set :snapshot, nil
+    get "/sessions/#{@ids[:parent_id]}"
+    assert last_response.ok?
+    assert_match(/Est\. tokens/, last_response.body)
+    assert_match(/Recorded usage/, last_response.body)
+    assert_match(/partial/i, last_response.body)
+    assert_match(/\$0\.4608/, last_response.body)
   end
 end
 

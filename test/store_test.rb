@@ -172,6 +172,93 @@ class StoreTest < Minitest::Test
     assert_equal "hybrid", est[:est_source]
     assert_equal 50_000, est[:context_tokens]
     assert est[:est_tokens] >= 50_000
+    refute est[:billed]
+  end
+
+  def test_usage_json_preferred_when_ledger_covers_session
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    FixtureHelper.write_usage(
+      dir, @ids[:parent_id],
+      turns: 3, input: 10_000, output: 400, cached: 2_000,
+      reasoning: 50, calls: 4, cost_ticks: 4_608_349_120
+    )
+    est = GrokLens::Estimate.for_session(
+      session_dir: dir,
+      chat_history_bytes: 1000,
+      events_bytes: 1000,
+      num_messages: 40,
+      num_turns: 3
+    )
+    assert_equal "usage", est[:est_source]
+    assert est[:billed]
+    assert_equal 10_400, est[:est_tokens]
+    assert_in_delta 0.460834912, est[:cost_usd], 1e-9
+    refute est[:usage][:incomplete]
+    assert_equal 10_000, est[:usage][:input_tokens]
+    assert_equal 400, est[:usage][:output_tokens]
+    assert_equal 2_000, est[:usage][:cached_read_tokens]
+    assert_equal 50, est[:usage][:reasoning_tokens]
+    assert_equal 4, est[:usage][:model_calls]
+    assert_equal 3, est[:usage][:recorded_turns]
+  end
+
+  def test_partial_usage_json_keeps_lifetime_estimate
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    File.write(File.join(dir, "signals.json"), JSON.pretty_generate(
+      "contextTokensUsed" => 50_000,
+      "contextWindowTokens" => 500_000,
+      "turnCount" => 28,
+      "toolCallCount" => 20
+    ))
+    FixtureHelper.write_usage(
+      dir, @ids[:parent_id],
+      turns: 1, input: 539_483, output: 433, cached: 237_568,
+      reasoning: 178, calls: 2, cost_ticks: 4_608_349_120,
+      turn_numbers: [28]
+    )
+    est = GrokLens::Estimate.for_session(
+      session_dir: dir,
+      chat_history_bytes: 1000,
+      events_bytes: 1000,
+      num_messages: 40,
+      num_turns: 28
+    )
+    refute est[:billed]
+    assert_equal "hybrid", est[:est_source]
+    assert est[:est_tokens] >= 50_000
+    assert est[:usage][:incomplete]
+    assert_equal 1, est[:usage][:recorded_turns]
+    assert_in_delta 0.460834912, est[:usage][:cost_usd], 1e-9
+    assert_nil est[:cost_usd]
+  end
+
+  def test_scan_marks_complete_usage_as_billed
+    dir = File.join(@home, "sessions", "%2Ftmp%2Fdemo-project", @ids[:parent_id])
+    FixtureHelper.write_usage(dir, @ids[:parent_id], turns: 3, input: 8_000, output: 200, cost_ticks: 10_000_000_000)
+    snap = @store.scan
+    parent = snap.session(@ids[:parent_id])
+    assert parent.billed?
+    assert_equal 8_200, parent.est_tokens
+    assert_in_delta 1.0, parent.cost_usd, 1e-9
+    assert_equal "usage", parent.est_source
+    assert snap.billed_count >= 1
+    assert_in_delta 1.0, snap.total_cost_usd, 1e-9
+    assert_equal "8k", parent.tokens_label
+  end
+
+  def test_format_tokens_exact_vs_approx
+    assert_equal "~1.5M", GrokLens::Estimate.format_tokens(1_500_000)
+    assert_equal "1.5M", GrokLens::Estimate.format_tokens(1_500_000, approx: false)
+    assert_equal "~12k", GrokLens::Estimate.format_tokens(12_000)
+    assert_equal "12k", GrokLens::Estimate.format_tokens(12_000, approx: false)
+    assert_equal "~433", GrokLens::Estimate.format_tokens(433)
+    assert_equal "433", GrokLens::Estimate.format_tokens(433, approx: false)
+  end
+
+  def test_cost_from_ticks
+    assert_in_delta 1.0, GrokLens::Estimate.cost_from_ticks(10_000_000_000), 1e-12
+    assert_in_delta 0.460834912, GrokLens::Estimate.cost_from_ticks(4_608_349_120), 1e-9
+    assert_nil GrokLens::Estimate.cost_from_ticks(nil)
   end
 
   def test_cost_helper
