@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruby](https://img.shields.io/badge/Ruby-%3E%3D%204.0-red.svg)](https://www.ruby-lang.org/)
 
-Local, **read-only** ledger for [Grok Build](https://x.ai/) sessions under `~/.grok` and [Grok Bot](https://x.ai/bot) agents.
+Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions under `~/.grok` and [Grok Bot](https://x.ai/bot) agents.
 
-Ruby **4.x** · Sinatra · dense session ledger
+Ruby **4.x** · Sinatra
 
 > **Privacy:** Session data can include prompts and code. Binds to `127.0.0.1` by default and never writes to `~/.grok`. See [SECURITY.md](SECURITY.md).
 
@@ -87,6 +87,8 @@ GROK_HOME=/path/to/.grok PORT=9292 bin/grok-lens
 Dual-home dashboard (synthetic demo data — not real session history):
 
 ![Grok Lens home dashboard](docs/images/home.png)
+
+The layout is inspired by [Edward Tufte](https://www.edwardtufte.com/tufte/)’s data visualization: dense tables, sparklines, high data-ink, little chrome.
 
 ## Data sources (read-only)
 

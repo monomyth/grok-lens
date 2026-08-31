@@ -1,4 +1,4 @@
-/* Grok Lens — dense session ledger
+/* Grok Lens — dense dashboard (Tufte-inspired data display)
    Theme is applied ONLY via html[data-theme=light|dark] (resolved; never leave :root fighting dark). */
 
 html[data-theme="light"] {
