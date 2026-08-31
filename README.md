@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruby](https://img.shields.io/badge/Ruby-%3E%3D%204.0-red.svg)](https://www.ruby-lang.org/)
 
-Local, **read-only** dashboard for [Grok Build](https://x.ai/) sessions under `~/.grok` and [Grok Bot](https://x.ai/bot) agents on this Mac.
+Local, **read-only** ledger for [Grok Build](https://x.ai/) sessions under `~/.grok` and [Grok Bot](https://x.ai/bot) agents on this Mac.
 
-Ruby **4.x** · Sinatra · Tufte-inspired dense UI
+Ruby **4.x** · Sinatra · dense session ledger
 
 > **Privacy:** Session data can include prompts and code. Binds to `127.0.0.1` by default and never writes to `~/.grok`. See [SECURITY.md](SECURITY.md).
 
