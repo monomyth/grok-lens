@@ -138,4 +138,4 @@ grok-lens/
 
 ## Disclaimer
 
-Grok Lens is an independent community tool. It is not affiliated with or endorsed by xAI. “Grok” and related marks belong to their respective owners.
+Grok Lens is an independent community tool. It is not affiliated with or endorsed by SpaceXAI. “Grok,” SpaceXAI, and related marks belong to their respective owners.
